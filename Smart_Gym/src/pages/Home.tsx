@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dumbbell, Target, Users, TrendingUp } from "lucide-react";
+import { Activity, Target, Users, TrendingUp } from "lucide-react";
 import heroImage from "@/assets/hero-fitness.jpg";
 
 const Home = () => {
   const features = [
     {
-      icon: Dumbbell,
+      icon: Activity,
       title: "Exercise Library",
       description: "Access hundreds of exercises with detailed instructions and video guides",
     },
