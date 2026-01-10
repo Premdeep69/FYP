@@ -50,7 +50,7 @@ const Home = () => {
               </span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8">
-              Get personalized workout plans, expert guidance, and track your progress with Smart Gym Fitness
+              Get personalized workout plans, expert guidance, and track your progress
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/workout-plans">
@@ -76,7 +76,7 @@ const Home = () => {
               Your Complete Fitness Platform
             </h2>
             <p className="text-lg text-muted-foreground">
-              Smart Gym Fitness combines cutting-edge technology with expert knowledge to help you achieve your fitness goals faster and smarter.
+              Our platform combines cutting-edge technology with expert knowledge to help you achieve your fitness goals faster and smarter.
             </p>
           </div>
 
@@ -100,7 +100,7 @@ const Home = () => {
               Ready to Start Your Journey?
             </h2>
             <p className="text-lg text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-              Join thousands of members who are already transforming their lives with Smart Gym Fitness
+              Join thousands of members who are already transforming their lives
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/register">

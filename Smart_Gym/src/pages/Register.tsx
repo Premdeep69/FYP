@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Dumbbell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
@@ -20,7 +19,7 @@ const Register = () => {
     e.preventDefault();
     toast({
       title: "Account Created",
-      description: "Welcome to Smart Gym Fitness!",
+      description: "Welcome!",
     });
     
     if (userType === "trainer") {
@@ -34,13 +33,7 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center py-12 px-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-heading font-bold mb-2">
-            <Dumbbell className="w-8 h-8 text-primary" />
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Smart Gym
-            </span>
-          </Link>
-          <h2 className="text-2xl font-heading font-bold mt-4">Create Account</h2>
+          <h2 className="text-2xl font-heading font-bold">Create Account</h2>
           <p className="text-muted-foreground">Start your fitness journey today</p>
         </div>
 

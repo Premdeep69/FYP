@@ -4,7 +4,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Dumbbell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
@@ -17,7 +16,7 @@ const Login = () => {
     e.preventDefault();
     toast({
       title: "Login Successful",
-      description: "Welcome back to Smart Gym Fitness!",
+      description: "Welcome back!",
     });
     navigate("/user-dashboard");
   };
@@ -26,13 +25,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center py-12 px-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-2xl font-heading font-bold mb-2">
-            <Dumbbell className="w-8 h-8 text-primary" />
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Smart Gym
-            </span>
-          </Link>
-          <h2 className="text-2xl font-heading font-bold mt-4">Welcome Back</h2>
+          <h2 className="text-2xl font-heading font-bold">Welcome Back</h2>
           <p className="text-muted-foreground">Login to continue your fitness journey</p>
         </div>
 

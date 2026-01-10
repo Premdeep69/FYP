@@ -20,14 +20,7 @@ const Navbar = () => {
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 text-xl font-heading font-bold">
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Smart Gym
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - moved to left */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link
@@ -51,7 +44,7 @@ const Navbar = () => {
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button - moved to left on mobile */}
           <button
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
