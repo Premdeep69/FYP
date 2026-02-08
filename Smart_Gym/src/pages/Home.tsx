@@ -2,9 +2,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Activity, Target, Users, TrendingUp } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import heroImage from "@/assets/hero-fitness.jpg";
 
 const Home = () => {
+  const { user } = useAuth();
+  
   const features = [
     {
       icon: Activity,
@@ -53,16 +56,26 @@ const Home = () => {
               Get personalized workout plans, expert guidance, and track your progress
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/workout-plans">
-                <Button size="lg" className="w-full sm:w-auto text-lg h-12 px-8">
-                  Start Workout
-                </Button>
-              </Link>
-              <Link to="/trainers">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-12 px-8">
-                  Join as Trainer
-                </Button>
-              </Link>
+              {user ? (
+                <Link to="/dashboard">
+                  <Button size="lg" className="w-full sm:w-auto text-lg h-12 px-8">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <>
+                  <Link to="/workout-plans">
+                    <Button size="lg" className="w-full sm:w-auto text-lg h-12 px-8">
+                      Start Workout
+                    </Button>
+                  </Link>
+                  <Link to="/register">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-12 px-8">
+                      Get Started
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -92,31 +105,33 @@ const Home = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <Card className="p-12 text-center hero-gradient border-0">
-            <h2 className="text-3xl md:text-4xl font-heading font-bold text-primary-foreground mb-4">
-              Ready to Start Your Journey?
-            </h2>
-            <p className="text-lg text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-              Join thousands of members who are already transforming their lives
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register">
-                <Button size="lg" variant="secondary" className="w-full sm:w-auto text-lg h-12 px-8">
-                  Create Free Account
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-12 px-8 bg-white/10 text-white border-white/20 hover:bg-white/20">
-                  Login
-                </Button>
-              </Link>
-            </div>
-          </Card>
-        </div>
-      </section>
+      {/* CTA Section - Only show for non-logged-in users */}
+      {!user && (
+        <section className="py-20">
+          <div className="container mx-auto px-4">
+            <Card className="p-12 text-center hero-gradient border-0">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold text-primary-foreground mb-4">
+                Ready to Start Your Journey?
+              </h2>
+              <p className="text-lg text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
+                Join thousands of members who are already transforming their lives
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/register">
+                  <Button size="lg" variant="secondary" className="w-full sm:w-auto text-lg h-12 px-8">
+                    Create Free Account
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-12 px-8 bg-white/10 text-white border-white/20 hover:bg-white/20">
+                    Login
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          </div>
+        </section>
+      )}
     </div>
   );
 };

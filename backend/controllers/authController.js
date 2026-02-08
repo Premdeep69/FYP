@@ -4,7 +4,24 @@ import jwt from "jsonwebtoken";
 
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, userType } = req.body;
+    const { 
+      name, 
+      email, 
+      password, 
+      userType,
+      // User-specific fields
+      age,
+      height,
+      weight,
+      fitnessLevel,
+      fitnessGoals,
+      // Trainer-specific fields
+      bio,
+      specializations,
+      certifications,
+      experience,
+      hourlyRate
+    } = req.body;
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -16,13 +33,40 @@ export const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user
-    const user = await User.create({
+    // Build user object
+    const userData = {
       name,
       email,
       password: hashedPassword,
       userType,
-    });
+    };
+
+    // Add user-specific profile data
+    if (userType === "user") {
+      userData.profile = {
+        age: age ? parseInt(age) : undefined,
+        height: height ? parseFloat(height) : undefined,
+        weight: weight ? parseFloat(weight) : undefined,
+        fitnessLevel: fitnessLevel || "beginner",
+        goals: fitnessGoals || [],
+      };
+    }
+
+    // Add trainer-specific profile data
+    if (userType === "trainer") {
+      userData.profile = {
+        bio: bio || "",
+      };
+      userData.trainerProfile = {
+        specializations: specializations || [],
+        certifications: certifications || [],
+        experience: experience ? parseInt(experience) : 0,
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
+      };
+    }
+
+    // Create user
+    const user = await User.create(userData);
 
     // Generate token
     const token = jwt.sign(
@@ -39,6 +83,8 @@ export const registerUser = async (req, res) => {
         name: user.name,
         email: user.email,
         userType: user.userType,
+        profile: user.profile,
+        trainerProfile: user.trainerProfile,
       },
     });
   } catch (error) {
@@ -79,6 +125,20 @@ export const loginUser = async (req, res) => {
         userType: user.userType,
       },
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get all trainers
+export const getTrainers = async (req, res) => {
+  try {
+    const trainers = await User.find({ 
+      userType: "trainer",
+      isActive: true 
+    }).select('-password');
+
+    res.json(trainers);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

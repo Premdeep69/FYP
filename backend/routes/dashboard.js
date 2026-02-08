@@ -12,16 +12,16 @@ const router = express.Router();
 // Protected routes
 router.use(protect);
 
-// User dashboard
+// User dashboard - only users can access
 router.get("/user", authorize("user"), getUserDashboard);
 
-// Trainer dashboard
+// Trainer dashboard - only trainers can access
 router.get("/trainer", authorize("trainer"), getTrainerDashboard);
 
-// Log workout (users only)
-router.post("/workout", authorize("user"), logWorkout);
+// Log workout - both users and trainers can log workouts
+router.post("/workout", logWorkout);
 
-// Update goals (users only)
-router.put("/goals", authorize("user"), updateGoals);
+// Update goals - both users and trainers can update goals
+router.put("/goals", updateGoals);
 
 export default router;
