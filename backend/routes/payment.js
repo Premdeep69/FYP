@@ -7,6 +7,15 @@ import {
   cancelSubscription,
   getTrainerEarnings,
   handleStripeWebhook,
+  generatePaymentInvoice,
+  downloadInvoice,
+  getPaymentMethods,
+  addPaymentMethod,
+  removePaymentMethod,
+  setDefaultPaymentMethod,
+  refundPayment,
+  getPaymentStatistics,
+  verifyPaymentStatus,
 } from "../controllers/paymentController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -28,6 +37,25 @@ router.put("/subscriptions/:subscriptionId/cancel", cancelSubscription);
 
 // Payment history
 router.get("/history", getPaymentHistory);
+
+// Payment statistics
+router.get("/statistics", getPaymentStatistics);
+
+// Invoice generation
+router.post("/invoice/:paymentId", generatePaymentInvoice);
+router.get("/invoice/download/:filename", downloadInvoice);
+
+// Payment methods
+router.get("/methods", getPaymentMethods);
+router.post("/methods", addPaymentMethod);
+router.delete("/methods/:paymentMethodId", removePaymentMethod);
+router.put("/methods/default", setDefaultPaymentMethod);
+
+// Payment verification
+router.get("/verify/:paymentIntentId", verifyPaymentStatus);
+
+// Refunds (admin/trainer only)
+router.post("/refund/:paymentId", authorize("trainer", "admin"), refundPayment);
 
 // Trainer earnings (trainers only)
 router.get("/earnings", authorize("trainer"), getTrainerEarnings);

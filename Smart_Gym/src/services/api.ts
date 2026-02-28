@@ -66,9 +66,48 @@ export interface UserDashboardData {
     totalMinutes: number;
     totalCalories: number;
   };
+  lastWeekStats?: {
+    workoutSessions: number;
+    totalMinutes: number;
+    totalCalories: number;
+  };
+  monthlyStats?: {
+    workoutSessions: number;
+    totalMinutes: number;
+    totalCalories: number;
+  };
+  comparisons?: {
+    workouts: number;
+    minutes: number;
+    calories: number;
+  };
   currentStreak: number;
+  longestStreak?: number;
+  avgWorkoutDuration?: number;
+  avgWorkoutsPerWeek?: number;
   activeGoals: Goal[];
   recentWorkouts: Workout[];
+  weeklyActivityData?: Array<{
+    day: string;
+    date: string;
+    workouts: number;
+    calories: number;
+    minutes: number;
+  }>;
+  monthlyProgressData?: Array<{
+    week: string;
+    weekStart: string;
+    weekEnd: string;
+    workouts: number;
+    calories: number;
+    minutes: number;
+  }>;
+  workoutTypeDistribution?: Array<{
+    name: string;
+    value: number;
+    count: number;
+    color: string;
+  }>;
 }
 
 export interface TrainerDashboardData {
@@ -201,6 +240,72 @@ class ApiService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Failed to update goals');
+    }
+
+    return response.json();
+  }
+
+  async getWorkoutAnalytics(period: number = 30): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/analytics?period=${period}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get workout analytics');
+    }
+
+    return response.json();
+  }
+
+  async getWorkoutHistory(params: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {}): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.type) queryParams.append('type', params.type);
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+
+    const response = await fetch(`${API_BASE_URL}/dashboard/workouts?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get workout history');
+    }
+
+    return response.json();
+  }
+
+  async updateWorkout(workoutId: string, updates: any): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update workout');
+    }
+
+    return response.json();
+  }
+
+  async deleteWorkout(workoutId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete workout');
     }
 
     return response.json();
@@ -613,3 +718,119 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+
+
+  // Payment Methods
+  async getPaymentMethods(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/methods`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get payment methods');
+    }
+
+    return response.json();
+  }
+
+  async addPaymentMethod(paymentMethodId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/methods`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ paymentMethodId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add payment method');
+    }
+
+    return response.json();
+  }
+
+  async removePaymentMethod(paymentMethodId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/methods/${paymentMethodId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to remove payment method');
+    }
+
+    return response.json();
+  }
+
+  async setDefaultPaymentMethod(paymentMethodId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/methods/default`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ paymentMethodId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to set default payment method');
+    }
+
+    return response.json();
+  }
+
+  // Invoice Generation
+  async generateInvoice(paymentId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/invoice/${paymentId}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to generate invoice');
+    }
+
+    return response.json();
+  }
+
+  async downloadInvoice(filename: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE_URL}/payment/invoice/download/${filename}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to download invoice');
+    }
+
+    return response.blob();
+  }
+
+  // Payment Statistics
+  async getPaymentStatistics(startDate?: string, endDate?: string): Promise<any> {
+    let url = `${API_BASE_URL}/payment/statistics`;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get payment statistics');
+    }
+
+    return response.json();
+  }
+
+  // Payment Verification
+  async verifyPaymentStatus(paymentIntentId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/payment/verify/${paymentIntentId}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to verify payment status');
+    }
+
+    return response.json();
+  }

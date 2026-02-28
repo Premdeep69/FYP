@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Search, Filter, Star } from "lucide-react";
+import { ExternalLink, Search, Filter, Star, Video } from "lucide-react";
 import { apiService } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +22,7 @@ interface Exercise {
   equipment: string[];
   tips?: string[];
   warnings?: string[];
+  videoUrl?: string;
   averageRating: number;
   totalRatings: number;
   popularity: number;
@@ -88,6 +89,7 @@ const Exercises = () => {
       if (selectedDifficulty) params.difficulty = selectedDifficulty;
 
       const response = await apiService.getExercises(params);
+      console.log('Fetched exercises:', response.exercises.map(e => ({ name: e.name, videoUrl: e.videoUrl })));
       setExercises(response.exercises);
     } catch (error) {
       console.error("Failed to fetch exercises:", error);
@@ -102,18 +104,32 @@ const Exercises = () => {
   };
 
   const handleRateExercise = async (exerciseId: string, rating: number) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to rate exercises.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await apiService.rateExercise(exerciseId, rating);
       toast({
         title: "Success",
-        description: "Exercise rated successfully!",
+        description: `You rated this exercise ${rating} star${rating !== 1 ? 's' : ''}!`,
       });
-      // Refresh exercises to show updated rating
+      // Refresh the selected exercise to show updated rating
+      if (selectedExercise) {
+        const updatedExercise = await apiService.getExerciseById(exerciseId);
+        setSelectedExercise(updatedExercise);
+      }
+      // Refresh exercises list to show updated rating
       fetchExercises();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to rate exercise. Please try again.",
+        description: error.message || "Failed to rate exercise. Please try again.",
         variant: "destructive",
       });
     }
@@ -132,17 +148,36 @@ const Exercises = () => {
     }
   };
 
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return null;
+    
+    // Extract video ID from various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return `https://www.youtube.com/embed/${match[1]}`;
+      }
+    }
+    
+    return null;
+  };
+
   const renderStars = (rating: number, onRate?: (rating: number) => void) => {
     return (
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`w-4 h-4 ${
+            className={`w-4 h-4 transition-all ${
               star <= rating
                 ? "fill-yellow-400 text-yellow-400"
                 : "text-gray-300"
-            } ${onRate ? "cursor-pointer hover:text-yellow-400" : ""}`}
+            } ${onRate ? "cursor-pointer hover:scale-110 hover:text-yellow-400" : ""}`}
             onClick={() => onRate && onRate(star)}
           />
         ))}
@@ -243,10 +278,19 @@ const Exercises = () => {
             <Card
               key={exercise._id}
               className="p-6 card-hover cursor-pointer"
-              onClick={() => setSelectedExercise(exercise)}
+              onClick={() => {
+                console.log('Selected exercise:', exercise.name, 'Video URL:', exercise.videoUrl);
+                console.log('Embed URL:', getYouTubeEmbedUrl(exercise.videoUrl || ''));
+                setSelectedExercise(exercise);
+              }}
             >
               <div className="flex items-start justify-between mb-4">
-                <h3 className="text-xl font-heading font-bold">{exercise.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-heading font-bold">{exercise.name}</h3>
+                  {exercise.videoUrl && (
+                    <Video className="w-4 h-4 text-primary" title="Has tutorial video" />
+                  )}
+                </div>
                 <Badge className={getDifficultyColor(exercise.difficulty)}>
                   {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
                 </Badge>
@@ -324,6 +368,25 @@ const Exercises = () => {
                 <p className="text-muted-foreground">{selectedExercise.description}</p>
               </div>
 
+              {selectedExercise.videoUrl && (
+                <div>
+                  <h4 className="font-heading font-bold mb-3">Tutorial Video</h4>
+                  {getYouTubeEmbedUrl(selectedExercise.videoUrl) ? (
+                    <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                      <iframe
+                        className="absolute top-0 left-0 w-full h-full rounded-lg border-0"
+                        src={getYouTubeEmbedUrl(selectedExercise.videoUrl) || ''}
+                        title={`${selectedExercise.name} Tutorial`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Invalid video URL</p>
+                  )}
+                </div>
+              )}
+
               {selectedExercise.instructions && selectedExercise.instructions.length > 0 && (
                 <div>
                   <h4 className="font-heading font-bold mb-3">Step-by-Step Instructions</h4>
@@ -377,13 +440,25 @@ const Exercises = () => {
 
               <div>
                 <h4 className="font-heading font-bold mb-2">Rating</h4>
-                <div className="flex items-center gap-4">
-                  {renderStars(selectedExercise.averageRating, (rating) => 
-                    handleRateExercise(selectedExercise._id, rating)
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    {renderStars(selectedExercise.averageRating, (rating) => 
+                      handleRateExercise(selectedExercise._id, rating)
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      Based on {selectedExercise.totalRatings} {selectedExercise.totalRatings === 1 ? 'review' : 'reviews'}
+                    </span>
+                  </div>
+                  {user && (
+                    <p className="text-xs text-muted-foreground">
+                      Click on the stars to rate this exercise
+                    </p>
                   )}
-                  <span className="text-sm text-muted-foreground">
-                    Based on {selectedExercise.totalRatings} reviews
-                  </span>
+                  {!user && (
+                    <p className="text-xs text-muted-foreground">
+                      Log in to rate this exercise
+                    </p>
+                  )}
                 </div>
               </div>
 

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X, User, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import NotificationCenter from "./NotificationCenter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "Exercises", path: "/exercises" },
     { name: "Workout Plans", path: "/workout-plans" },
+    ...(user && user.userType === "user" ? [{ name: "My Workouts", path: "/my-workouts" }] : []),
     { name: "Trainers", path: "/trainers" },
     { name: "Chat", path: "/chat" },
     { name: "Subscription", path: "/subscription" },
@@ -46,6 +48,7 @@ const Navbar = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
+            {user && <NotificationCenter />}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -106,6 +109,9 @@ const Navbar = () => {
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
                 {user ? (
                   <>
+                    <div className="flex justify-center pb-2">
+                      <NotificationCenter />
+                    </div>
                     <Link to={user.userType === 'trainer' ? '/trainer-dashboard' : '/user-dashboard'} onClick={() => setMobileMenuOpen(false)}>
                       <Button variant="ghost" className="w-full justify-start">
                         <User className="w-4 h-4 mr-2" />

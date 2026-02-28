@@ -66,38 +66,7 @@ const Login = () => {
           <p className="text-muted-foreground">Login to continue your fitness journey</p>
         </div>
 
-        {/* Test Credentials Info */}
-        <Alert className="mb-6 bg-blue-50 border-blue-200">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-sm text-blue-800">
-            <strong>Test Credentials:</strong>
-            <div className="mt-2 space-y-1">
-              <div>User: <code className="bg-blue-100 px-1 rounded">user@example.com</code></div>
-              <div>Trainer: <code className="bg-blue-100 px-1 rounded">trainer@example.com</code></div>
-              <div>Password: <code className="bg-blue-100 px-1 rounded">password123</code></div>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleQuickLogin("user@example.com")}
-                className="text-xs"
-              >
-                Login as User
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleQuickLogin("trainer@example.com")}
-                className="text-xs"
-              >
-                Login as Trainer
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
+       
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

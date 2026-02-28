@@ -1,61 +1,133 @@
 import Exercise from "../models/exercise.js";
 import User from "../models/users.js";
 
+// Helper function for building filters
+const buildExerciseFilter = (query) => {
+  const filter = { isActive: true };
+  
+  if (query.category) {
+    filter.category = query.category;
+  }
+  
+  if (query.difficulty) {
+    filter.difficulty = query.difficulty;
+  }
+  
+  if (query.muscleGroups) {
+    const muscles = Array.isArray(query.muscleGroups) 
+      ? query.muscleGroups 
+      : query.muscleGroups.split(',');
+    filter.muscleGroups = { $in: muscles };
+  }
+  
+  if (query.equipment) {
+    const equipmentList = Array.isArray(query.equipment) 
+      ? query.equipment 
+      : query.equipment.split(',');
+    filter.equipment = { $in: equipmentList };
+  }
+  
+  if (query.tags) {
+    const tagList = Array.isArray(query.tags) 
+      ? query.tags 
+      : query.tags.split(',');
+    filter.tags = { $in: tagList };
+  }
+  
+  if (query.search) {
+    filter.$text = { $search: query.search };
+  }
+  
+  if (query.minRating) {
+    filter.averageRating = { $gte: parseFloat(query.minRating) };
+  }
+  
+  if (query.createdBy) {
+    filter.createdBy = query.createdBy;
+  }
+
+  return filter;
+};
+
+// Helper function for building sort options
+const buildSortOptions = (sortBy = "popularity", sortOrder = "desc") => {
+  const sortOptions = {};
+  const order = sortOrder === "desc" ? -1 : 1;
+  
+  switch (sortBy) {
+    case "popularity":
+      sortOptions.popularity = order;
+      break;
+    case "rating":
+      sortOptions.averageRating = order;
+      break;
+    case "name":
+      sortOptions.name = order;
+      break;
+    case "created":
+      sortOptions.createdAt = order;
+      break;
+    case "updated":
+      sortOptions.updatedAt = order;
+      break;
+    default:
+      sortOptions.popularity = -1;
+  }
+  
+  return sortOptions;
+};
+
 // Get all exercises with filtering and pagination
 export const getExercises = async (req, res) => {
   try {
     const {
       page = 1,
       limit = 20,
-      category,
-      difficulty,
-      muscleGroups,
-      equipment,
-      search,
       sortBy = "popularity",
       sortOrder = "desc"
     } = req.query;
 
-    // Build filter object
-    const filter = { isActive: true };
-    
-    if (category) filter.category = category;
-    if (difficulty) filter.difficulty = difficulty;
-    if (muscleGroups) {
-      const muscles = Array.isArray(muscleGroups) ? muscleGroups : [muscleGroups];
-      filter.muscleGroups = { $in: muscles };
-    }
-    if (equipment) {
-      const equipmentList = Array.isArray(equipment) ? equipment : [equipment];
-      filter.equipment = { $in: equipmentList };
-    }
-    if (search) {
-      filter.$text = { $search: search };
-    }
+    // Build filter and sort
+    const filter = buildExerciseFilter(req.query);
+    const sortOptions = buildSortOptions(sortBy, sortOrder);
 
-    // Build sort object
-    const sortOptions = {};
-    if (sortBy === "popularity") sortOptions.popularity = sortOrder === "desc" ? -1 : 1;
-    else if (sortBy === "rating") sortOptions.averageRating = sortOrder === "desc" ? -1 : 1;
-    else if (sortBy === "name") sortOptions.name = sortOrder === "desc" ? -1 : 1;
-    else if (sortBy === "created") sortOptions.createdAt = sortOrder === "desc" ? -1 : 1;
-
+    // Execute query with pagination
     const exercises = await Exercise.find(filter)
-      .populate("createdBy", "name email userType")
+      .populate("createdBy", "name email userType trainerProfile")
       .sort(sortOptions)
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
+
+    // If user is authenticated, add their personal ratings
+    if (req.user) {
+      const user = await User.findById(req.user._id).select('exerciseRatings');
+      const userRatings = user.exerciseRatings || [];
+      
+      exercises.forEach(exercise => {
+        const userRating = userRatings.find(r => r.exerciseId.toString() === exercise._id.toString());
+        exercise.userRating = userRating ? userRating.rating : 0;
+      });
+    } else {
+      exercises.forEach(exercise => {
+        exercise.userRating = 0;
+      });
+    }
 
     const total = await Exercise.countDocuments(filter);
 
     res.json({
       exercises,
-      totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      total,
-      hasMore: page * limit < total,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      }
     });
   } catch (error) {
+    console.error('Get exercises error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -66,10 +138,20 @@ export const getExerciseById = async (req, res) => {
     const { id } = req.params;
     
     const exercise = await Exercise.findById(id)
-      .populate("createdBy", "name email userType");
+      .populate("createdBy", "name email userType")
+      .lean();
 
     if (!exercise) {
       return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    // If user is authenticated, add their personal rating
+    if (req.user) {
+      const user = await User.findById(req.user._id).select('exerciseRatings');
+      const userRating = user.exerciseRatings?.find(r => r.exerciseId.toString() === id);
+      exercise.userRating = userRating ? userRating.rating : 0;
+    } else {
+      exercise.userRating = 0;
     }
 
     // Increment popularity
@@ -199,13 +281,8 @@ export const rateExercise = async (req, res) => {
 
     if (existingRating) {
       // Update existing rating
-      const oldRating = existingRating.rating;
       existingRating.rating = rating;
       existingRating.ratedAt = new Date();
-      
-      // Update exercise average rating
-      const newTotal = (exercise.averageRating * exercise.totalRatings) - oldRating + rating;
-      exercise.averageRating = newTotal / exercise.totalRatings;
     } else {
       // Add new rating
       if (!user.exerciseRatings) user.exerciseRatings = [];
@@ -214,20 +291,13 @@ export const rateExercise = async (req, res) => {
         rating,
         ratedAt: new Date(),
       });
-
-      // Update exercise rating stats
-      const newTotal = (exercise.averageRating * exercise.totalRatings) + rating;
-      exercise.totalRatings += 1;
-      exercise.averageRating = newTotal / exercise.totalRatings;
     }
 
     await user.save();
-    await exercise.save();
 
     res.json({
       message: "Exercise rated successfully",
-      averageRating: exercise.averageRating,
-      totalRatings: exercise.totalRatings,
+      userRating: rating,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -266,6 +336,394 @@ export const getExercisesByMuscleGroup = async (req, res) => {
 
     res.json(exercises);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Bulk create exercises (admin/trainer only)
+export const bulkCreateExercises = async (req, res) => {
+  try {
+    const { exercises } = req.body;
+    const userId = req.user._id;
+
+    if (!Array.isArray(exercises) || exercises.length === 0) {
+      return res.status(400).json({ message: "Exercises array is required" });
+    }
+
+    // Add createdBy to each exercise
+    const exercisesWithCreator = exercises.map(ex => ({
+      ...ex,
+      createdBy: userId,
+    }));
+
+    const createdExercises = await Exercise.insertMany(exercisesWithCreator);
+
+    res.status(201).json({
+      message: `${createdExercises.length} exercises created successfully`,
+      exercises: createdExercises,
+      count: createdExercises.length,
+    });
+  } catch (error) {
+    console.error('Bulk create error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Bulk update exercises (admin only)
+export const bulkUpdateExercises = async (req, res) => {
+  try {
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ message: "Updates array is required" });
+    }
+
+    const results = [];
+    for (const update of updates) {
+      if (!update.id) continue;
+      
+      try {
+        const exercise = await Exercise.findByIdAndUpdate(
+          update.id,
+          update.data,
+          { new: true, runValidators: true }
+        );
+        if (exercise) {
+          results.push({ id: update.id, success: true, exercise });
+        }
+      } catch (err) {
+        results.push({ id: update.id, success: false, error: err.message });
+      }
+    }
+
+    res.json({
+      message: "Bulk update completed",
+      results,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+    });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Bulk delete exercises (admin only)
+export const bulkDeleteExercises = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Exercise IDs array is required" });
+    }
+
+    // Soft delete by setting isActive to false
+    const result = await Exercise.updateMany(
+      { _id: { $in: ids } },
+      { isActive: false }
+    );
+
+    res.json({
+      message: "Exercises deleted successfully",
+      deletedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Duplicate exercise
+export const duplicateExercise = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const originalExercise = await Exercise.findById(id);
+    if (!originalExercise) {
+      return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    // Create duplicate
+    const duplicateData = originalExercise.toObject();
+    delete duplicateData._id;
+    delete duplicateData.createdAt;
+    delete duplicateData.updatedAt;
+    duplicateData.name = `${duplicateData.name} (Copy)`;
+    duplicateData.createdBy = userId;
+    duplicateData.popularity = 0;
+    duplicateData.averageRating = 0;
+    duplicateData.totalRatings = 0;
+
+    const duplicate = await Exercise.create(duplicateData);
+    await duplicate.populate("createdBy", "name email userType");
+
+    res.status(201).json({
+      message: "Exercise duplicated successfully",
+      exercise: duplicate,
+    });
+  } catch (error) {
+    console.error('Duplicate exercise error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get exercise statistics
+export const getExerciseStats = async (req, res) => {
+  try {
+    const totalExercises = await Exercise.countDocuments({ isActive: true });
+    
+    const byCategory = await Exercise.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const byDifficulty = await Exercise.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$difficulty", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const topRated = await Exercise.find({ isActive: true })
+      .sort({ averageRating: -1, totalRatings: -1 })
+      .limit(5)
+      .select('name averageRating totalRatings category');
+
+    const mostPopular = await Exercise.find({ isActive: true })
+      .sort({ popularity: -1 })
+      .limit(5)
+      .select('name popularity averageRating category');
+
+    const avgRating = await Exercise.aggregate([
+      { $match: { isActive: true, totalRatings: { $gt: 0 } } },
+      { $group: { _id: null, avgRating: { $avg: "$averageRating" } } }
+    ]);
+
+    res.json({
+      totalExercises,
+      byCategory,
+      byDifficulty,
+      topRated,
+      mostPopular,
+      averageRating: avgRating[0]?.avgRating || 0,
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Search exercises with advanced options
+export const searchExercises = async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({ message: "Search query is required" });
+    }
+
+    // Text search with scoring
+    const exercises = await Exercise.find(
+      { 
+        $text: { $search: q },
+        isActive: true 
+      },
+      { score: { $meta: "textScore" } }
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .limit(parseInt(limit))
+      .populate("createdBy", "name email userType")
+      .lean();
+
+    res.json({
+      query: q,
+      results: exercises,
+      count: exercises.length,
+    });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get similar exercises
+export const getSimilarExercises = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 5 } = req.query;
+
+    const exercise = await Exercise.findById(id);
+    if (!exercise) {
+      return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    // Find exercises with similar muscle groups or category
+    const similar = await Exercise.find({
+      _id: { $ne: id },
+      isActive: true,
+      $or: [
+        { muscleGroups: { $in: exercise.muscleGroups } },
+        { category: exercise.category },
+        { equipment: { $in: exercise.equipment } }
+      ]
+    })
+      .sort({ popularity: -1, averageRating: -1 })
+      .limit(parseInt(limit))
+      .populate("createdBy", "name email userType")
+      .lean();
+
+    res.json(similar);
+  } catch (error) {
+    console.error('Get similar exercises error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get user's favorite exercises
+export const getFavoriteExercises = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).populate({
+      path: 'favoriteExercises',
+      match: { isActive: true },
+      populate: { path: 'createdBy', select: 'name email userType' }
+    });
+
+    res.json(user.favoriteExercises || []);
+  } catch (error) {
+    console.error('Get favorites error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Add exercise to favorites
+export const addToFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const exercise = await Exercise.findById(id);
+    if (!exercise) {
+      return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user.favoriteExercises) {
+      user.favoriteExercises = [];
+    }
+
+    if (user.favoriteExercises.includes(id)) {
+      return res.status(400).json({ message: "Exercise already in favorites" });
+    }
+
+    user.favoriteExercises.push(id);
+    await user.save();
+
+    res.json({ message: "Exercise added to favorites" });
+  } catch (error) {
+    console.error('Add to favorites error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Remove exercise from favorites
+export const removeFromFavorites = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user.favoriteExercises || !user.favoriteExercises.includes(id)) {
+      return res.status(400).json({ message: "Exercise not in favorites" });
+    }
+
+    user.favoriteExercises = user.favoriteExercises.filter(
+      exerciseId => exerciseId.toString() !== id
+    );
+    await user.save();
+
+    res.json({ message: "Exercise removed from favorites" });
+  } catch (error) {
+    console.error('Remove from favorites error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Get exercises created by specific trainer
+export const getTrainerExercises = async (req, res) => {
+  try {
+    const { trainerId } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    const exercises = await Exercise.find({
+      createdBy: trainerId,
+      isActive: true
+    })
+      .populate("createdBy", "name email userType trainerProfile")
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await Exercise.countDocuments({
+      createdBy: trainerId,
+      isActive: true
+    });
+
+    res.json({
+      exercises,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      }
+    });
+  } catch (error) {
+    console.error('Get trainer exercises error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Restore deleted exercise (admin only)
+export const restoreExercise = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exercise = await Exercise.findByIdAndUpdate(
+      id,
+      { isActive: true },
+      { new: true }
+    ).populate("createdBy", "name email userType");
+
+    if (!exercise) {
+      return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    res.json({
+      message: "Exercise restored successfully",
+      exercise,
+    });
+  } catch (error) {
+    console.error('Restore exercise error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Permanently delete exercise (admin only)
+export const permanentlyDeleteExercise = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const exercise = await Exercise.findByIdAndDelete(id);
+    if (!exercise) {
+      return res.status(404).json({ message: "Exercise not found" });
+    }
+
+    res.json({ message: "Exercise permanently deleted" });
+  } catch (error) {
+    console.error('Permanent delete error:', error);
     res.status(500).json({ message: error.message });
   }
 };

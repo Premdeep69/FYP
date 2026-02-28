@@ -83,6 +83,10 @@ const exerciseSchema = new mongoose.Schema(
       caption: String,
       isMain: { type: Boolean, default: false },
     }],
+    videoUrl: {
+      type: String,
+      trim: true,
+    },
     videos: [{
       url: String,
       title: String,

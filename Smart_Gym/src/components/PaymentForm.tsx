@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useSystemNotifications } from '@/services/systemNotifications';
 import { Loader2 } from 'lucide-react';
 
 interface PaymentFormProps {
@@ -28,6 +29,7 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
+  const systemNotifications = useSystemNotifications();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -54,11 +56,13 @@ const PaymentFormContent: React.FC<PaymentFormProps> = ({
           description: error.message,
           variant: 'destructive',
         });
+        systemNotifications.sendPaymentFailedNotification(error.message);
       } else {
         toast({
           title: 'Payment Successful',
           description: 'Your payment has been processed successfully!',
         });
+        systemNotifications.sendPaymentSuccessNotification(amount / 100, description);
         onSuccess();
       }
     } catch (error: any) {

@@ -248,18 +248,26 @@ export const enrollInWorkoutPlan = async (req, res) => {
 export const getUserWorkoutPlans = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { status = "active" } = req.query;
+    const { status } = req.query;
 
-    const userProgress = await UserWorkoutProgress.find({
-      userId,
-      ...(status && { status })
-    })
+    const filter = { userId };
+    if (status) {
+      filter.status = status;
+    }
+
+    const userProgress = await UserWorkoutProgress.find(filter)
       .populate({
         path: "workoutPlanId",
-        populate: {
-          path: "createdBy",
-          select: "name email userType"
-        }
+        populate: [
+          {
+            path: "createdBy",
+            select: "name email userType"
+          },
+          {
+            path: "workouts.exercises.exerciseId",
+            select: "name category muscleGroups difficulty equipment"
+          }
+        ]
       })
       .sort({ createdAt: -1 });
 

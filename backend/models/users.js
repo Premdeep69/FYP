@@ -78,6 +78,43 @@ const userSchema = new mongoose.Schema(
       type: String,
       sparse: true, // Allow multiple null values
     },
+    defaultPaymentMethodId: {
+      type: String,
+      sparse: true,
+    },
+    // Exercise favorites
+    favoriteExercises: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Exercise",
+    }],
+    // Exercise ratings
+    exerciseRatings: [{
+      exerciseId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Exercise",
+      },
+      rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      ratedAt: Date,
+    }],
+    // FCM token for push notifications
+    fcmToken: {
+      type: String,
+      sparse: true,
+    },
+    // Notification preferences
+    preferences: {
+      workoutReminders: { type: Boolean, default: true },
+      progressUpdates: { type: Boolean, default: true },
+      sessionReminders: { type: Boolean, default: true },
+      messageNotifications: { type: Boolean, default: true },
+      achievementNotifications: { type: Boolean, default: true },
+      reminderTime: { type: String, default: '09:00' }, // HH:MM format
+      reminderDays: [{ type: Number, min: 0, max: 6 }], // 0-6 (Sunday-Saturday)
+    },
   },
   { timestamps: true }
 );

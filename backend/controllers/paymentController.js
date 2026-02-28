@@ -3,6 +3,13 @@ import Payment from "../models/payment.js";
 import Subscription from "../models/subscription.js";
 import Session from "../models/session.js";
 import User from "../models/users.js";
+import invoiceService from "../services/invoiceService.js";
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create payment intent for session booking
 export const createSessionPayment = async (req, res) => {
@@ -406,4 +413,358 @@ const handleSubscriptionDeleted = async (subscription) => {
       canceledAt: new Date(),
     }
   );
+};
+
+
+// Generate invoice for a payment
+export const generatePaymentInvoice = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { paymentId } = req.params;
+
+    const payment = await Payment.findOne({ _id: paymentId, userId })
+      .populate('userId', 'name email address')
+      .populate('trainerId', 'name');
+
+    if (!payment) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
+    if (payment.status !== 'succeeded') {
+      return res.status(400).json({ message: "Cannot generate invoice for unsuccessful payment" });
+    }
+
+    // Check if invoice already exists
+    if (payment.invoiceUrl) {
+      return res.json({
+        invoiceUrl: payment.invoiceUrl,
+        invoiceNumber: payment.invoiceNumber
+      });
+    }
+
+    // Generate invoice
+    const invoice = await invoiceService.generatePaymentReceipt(payment);
+
+    // Update payment with invoice info
+    await Payment.findByIdAndUpdate(paymentId, {
+      invoiceUrl: invoice.url,
+      invoiceNumber: invoice.filename.replace('invoice-', '').replace('.pdf', ''),
+      invoiceGeneratedAt: new Date()
+    });
+
+    res.json({
+      invoiceUrl: invoice.url,
+      invoiceNumber: invoice.filename.replace('invoice-', '').replace('.pdf', ''),
+      message: 'Invoice generated successfully'
+    });
+  } catch (error) {
+    console.error('Generate invoice error:', error);
+    res.status(500).json({ message: 'Failed to generate invoice', error: error.message });
+  }
+};
+
+// Download invoice
+export const downloadInvoice = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filepath = path.join(__dirname, '../invoices', filename);
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    res.download(filepath);
+  } catch (error) {
+    console.error('Download invoice error:', error);
+    res.status(500).json({ message: 'Failed to download invoice' });
+  }
+};
+
+// Get payment methods for user
+export const getPaymentMethods = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user.stripeCustomerId) {
+      return res.json({ paymentMethods: [] });
+    }
+
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'card',
+    });
+
+    res.json({
+      paymentMethods: paymentMethods.data.map(pm => ({
+        id: pm.id,
+        brand: pm.card.brand,
+        last4: pm.card.last4,
+        expMonth: pm.card.exp_month,
+        expYear: pm.card.exp_year,
+        isDefault: pm.id === user.defaultPaymentMethodId
+      }))
+    });
+  } catch (error) {
+    console.error('Get payment methods error:', error);
+    res.status(500).json({ message: 'Failed to retrieve payment methods' });
+  }
+};
+
+// Add payment method
+export const addPaymentMethod = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { paymentMethodId } = req.body;
+
+    const user = await User.findById(userId);
+
+    // Get or create Stripe customer
+    let customer;
+    if (user.stripeCustomerId) {
+      customer = await stripe.customers.retrieve(user.stripeCustomerId);
+    } else {
+      customer = await stripe.customers.create({
+        email: user.email,
+        name: user.name,
+        metadata: { userId: userId.toString() },
+      });
+      
+      await User.findByIdAndUpdate(userId, {
+        stripeCustomerId: customer.id,
+      });
+    }
+
+    // Attach payment method to customer
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
+    });
+
+    // Set as default if it's the first payment method
+    const existingMethods = await stripe.paymentMethods.list({
+      customer: customer.id,
+      type: 'card',
+    });
+
+    if (existingMethods.data.length === 1) {
+      await stripe.customers.update(customer.id, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId,
+        },
+      });
+
+      await User.findByIdAndUpdate(userId, {
+        defaultPaymentMethodId: paymentMethodId,
+      });
+    }
+
+    res.json({ message: 'Payment method added successfully' });
+  } catch (error) {
+    console.error('Add payment method error:', error);
+    res.status(500).json({ message: 'Failed to add payment method', error: error.message });
+  }
+};
+
+// Remove payment method
+export const removePaymentMethod = async (req, res) => {
+  try {
+    const { paymentMethodId } = req.params;
+
+    await stripe.paymentMethods.detach(paymentMethodId);
+
+    res.json({ message: 'Payment method removed successfully' });
+  } catch (error) {
+    console.error('Remove payment method error:', error);
+    res.status(500).json({ message: 'Failed to remove payment method' });
+  }
+};
+
+// Set default payment method
+export const setDefaultPaymentMethod = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { paymentMethodId } = req.body;
+
+    const user = await User.findById(userId);
+
+    if (!user.stripeCustomerId) {
+      return res.status(400).json({ message: 'No Stripe customer found' });
+    }
+
+    await stripe.customers.update(user.stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    await User.findByIdAndUpdate(userId, {
+      defaultPaymentMethodId: paymentMethodId,
+    });
+
+    res.json({ message: 'Default payment method updated successfully' });
+  } catch (error) {
+    console.error('Set default payment method error:', error);
+    res.status(500).json({ message: 'Failed to set default payment method' });
+  }
+};
+
+// Refund payment
+export const refundPayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const { amount, reason } = req.body;
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    if (payment.status !== 'succeeded') {
+      return res.status(400).json({ message: 'Can only refund successful payments' });
+    }
+
+    // Create refund in Stripe
+    const refund = await stripe.refunds.create({
+      payment_intent: payment.stripePaymentIntentId,
+      amount: amount ? Math.round(amount * 100) : undefined, // Partial or full refund
+      reason: reason || 'requested_by_customer',
+      metadata: {
+        paymentId: paymentId.toString(),
+        refundedBy: req.user._id.toString()
+      }
+    });
+
+    // Update payment record
+    await Payment.findByIdAndUpdate(paymentId, {
+      status: 'refunded',
+      refundId: refund.id,
+      refundedAmount: refund.amount,
+      refundedAt: new Date(),
+      refundReason: reason
+    });
+
+    res.json({
+      message: 'Payment refunded successfully',
+      refundId: refund.id,
+      amount: refund.amount / 100
+    });
+  } catch (error) {
+    console.error('Refund payment error:', error);
+    res.status(500).json({ message: 'Failed to process refund', error: error.message });
+  }
+};
+
+// Get payment statistics
+export const getPaymentStatistics = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { startDate, endDate } = req.query;
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        createdAt: {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        },
+      };
+    }
+
+    const stats = await Payment.aggregate([
+      {
+        $match: {
+          userId: userId,
+          status: 'succeeded',
+          ...dateFilter,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSpent: { $sum: '$amount' },
+          totalPayments: { $sum: 1 },
+          averagePayment: { $avg: '$amount' },
+        },
+      },
+    ]);
+
+    const paymentsByType = await Payment.aggregate([
+      {
+        $match: {
+          userId: userId,
+          status: 'succeeded',
+          ...dateFilter,
+        },
+      },
+      {
+        $group: {
+          _id: '$paymentType',
+          total: { $sum: '$amount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const monthlySpending = await Payment.aggregate([
+      {
+        $match: {
+          userId: userId,
+          status: 'succeeded',
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+          },
+          spending: { $sum: '$amount' },
+          payments: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { '_id.year': -1, '_id.month': -1 },
+      },
+      {
+        $limit: 12,
+      },
+    ]);
+
+    res.json({
+      summary: stats[0] || {
+        totalSpent: 0,
+        totalPayments: 0,
+        averagePayment: 0,
+      },
+      byType: paymentsByType,
+      monthlyBreakdown: monthlySpending,
+    });
+  } catch (error) {
+    console.error('Get payment statistics error:', error);
+    res.status(500).json({ message: 'Failed to retrieve statistics' });
+  }
+};
+
+// Verify payment status
+export const verifyPaymentStatus = async (req, res) => {
+  try {
+    const { paymentIntentId } = req.params;
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    const payment = await Payment.findOne({ stripePaymentIntentId: paymentIntentId });
+
+    res.json({
+      status: paymentIntent.status,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+      paymentMethod: paymentIntent.payment_method,
+      localStatus: payment?.status,
+      created: new Date(paymentIntent.created * 1000)
+    });
+  } catch (error) {
+    console.error('Verify payment status error:', error);
+    res.status(500).json({ message: 'Failed to verify payment status' });
+  }
 };

@@ -15,6 +15,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSystemNotifications } from '@/services/systemNotifications';
 import { apiService } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,6 +37,7 @@ interface Subscription {
 const Subscription: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const systemNotifications = useSystemNotifications();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
 

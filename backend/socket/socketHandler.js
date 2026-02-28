@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/users.js";
 import Message from "../models/message.js";
 import Conversation from "../models/conversation.js";
+import notificationService from "../services/notificationService.js";
 
 // Store active users and their socket connections
 const activeUsers = new Map();
@@ -141,6 +142,19 @@ const handleConnection = (io) => {
             content: content.substring(0, 50) + (content.length > 50 ? "..." : ""),
             conversationId,
           });
+        }
+
+        // Send FCM notification if receiver is offline or not in active chat
+        if (!receiverConnection) {
+          try {
+            await notificationService.sendNewMessageNotification(
+              receiverId,
+              socket.user.name,
+              content.substring(0, 100)
+            );
+          } catch (error) {
+            console.error('Error sending message notification:', error);
+          }
         }
 
         console.log(`Message sent from ${socket.user.name} to ${receiverId}`);

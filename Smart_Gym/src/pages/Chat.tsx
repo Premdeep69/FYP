@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Send, Search, Phone, Video, MoreVertical, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { apiService } from "@/services/api";
 import { socketService, Message, Conversation, User } from "@/services/socket";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const Chat = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { addNotification } = useNotifications();
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -80,11 +82,24 @@ const Chat = () => {
   const setupSocketListeners = () => {
     // Listen for new messages
     socketService.onNewMessage((message: Message) => {
-      if (activeConversation && message.conversationId === activeConversation.conversationId) {
+      const isActiveChat = activeConversation && message.conversationId === activeConversation.conversationId;
+      
+      if (isActiveChat) {
         setMessages(prev => [...prev, message]);
         // Mark as read if conversation is active
         socketService.markAsRead(message._id, message.conversationId);
+      } else {
+        // Add notification for messages in other conversations
+        const senderName = message.senderId?.name || 'Someone';
+        addNotification({
+          type: 'new_message',
+          title: `💬 New message from ${senderName}`,
+          message: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''),
+          actionUrl: '/chat',
+          data: { conversationId: message.conversationId, messageId: message._id }
+        });
       }
+      
       // Update conversation list
       loadConversations();
     });
@@ -106,7 +121,30 @@ const Chat = () => {
           title: `New message from ${notification.senderName}`,
           description: notification.content,
         });
+        
+        // Add to notification center
+        addNotification({
+          type: 'new_message',
+          title: `💬 ${notification.senderName}`,
+          message: notification.content,
+          actionUrl: '/chat',
+          data: { conversationId: notification.conversationId }
+        });
       }
+    });
+
+    // Listen for user online/offline status
+    socketService.onUserOnline((data) => {
+      // Update user list with online status
+      setAvailableUsers(prev => 
+        prev.map(u => u._id === data.userId ? { ...u, isOnline: true } : u)
+      );
+    });
+
+    socketService.onUserOffline((data) => {
+      setAvailableUsers(prev => 
+        prev.map(u => u._id === data.userId ? { ...u, isOnline: false } : u)
+      );
     });
   };
 

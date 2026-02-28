@@ -9,6 +9,7 @@ import paymentRoutes from "./routes/payment.js";
 import exerciseRoutes from "./routes/exercise.js";
 import workoutRoutes from "./routes/workout.js";
 import seedRoutes from "./routes/seed.js";
+import notificationRoutes from "./routes/notification.js";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/seed", seedRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // Health check route
 app.get("/", (req, res) => {

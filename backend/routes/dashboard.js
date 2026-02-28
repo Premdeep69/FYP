@@ -3,7 +3,11 @@ import {
   getUserDashboard, 
   getTrainerDashboard, 
   logWorkout, 
-  updateGoals 
+  updateGoals,
+  getWorkoutAnalytics,
+  getWorkoutHistory,
+  updateWorkout,
+  deleteWorkout
 } from "../controllers/dashboardController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -18,10 +22,16 @@ router.get("/user", authorize("user"), getUserDashboard);
 // Trainer dashboard - only trainers can access
 router.get("/trainer", authorize("trainer"), getTrainerDashboard);
 
-// Log workout - both users and trainers can log workouts
+// Workout management - both users and trainers
 router.post("/workout", logWorkout);
+router.get("/workouts", getWorkoutHistory);
+router.put("/workout/:workoutId", updateWorkout);
+router.delete("/workout/:workoutId", deleteWorkout);
 
-// Update goals - both users and trainers can update goals
+// Analytics
+router.get("/analytics", getWorkoutAnalytics);
+
+// Goals management - both users and trainers
 router.put("/goals", updateGoals);
 
 export default router;

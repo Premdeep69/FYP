@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, TrendingUp, Flame, Search, Star, Clock, Users, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Target, TrendingUp, Flame, Search, Star, Clock, Users, Calendar, Dumbbell } from "lucide-react";
 import { apiService } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,6 +64,7 @@ interface WorkoutPlanFilters {
 
 const WorkoutPlans = () => {
   const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<WorkoutPlan | null>(null);
   const [filters, setFilters] = useState<WorkoutPlanFilters>({
     categories: [],
     difficulties: [],
@@ -381,7 +383,11 @@ const WorkoutPlans = () => {
                           >
                             Enroll Now
                           </Button>
-                          <Button variant="outline" className="w-full lg:w-auto">
+                          <Button 
+                            variant="outline" 
+                            className="w-full lg:w-auto"
+                            onClick={() => setSelectedPlan(plan)}
+                          >
                             View Details
                           </Button>
                         </div>
@@ -407,6 +413,196 @@ const WorkoutPlans = () => {
           </div>
         )}
       </div>
+
+      {/* Workout Plan Details Dialog */}
+      <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading font-bold flex items-center gap-2">
+              {selectedPlan?.name}
+              {selectedPlan?.isPremium && (
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  Premium
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedPlan && (
+            <div className="space-y-6">
+              {/* Overview */}
+              <div>
+                <h4 className="font-heading font-bold mb-2">Overview</h4>
+                <p className="text-muted-foreground">{selectedPlan.description}</p>
+              </div>
+
+              {/* Plan Details */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Duration</span>
+                  </div>
+                  <p className="text-lg font-bold">{selectedPlan.duration.weeks} weeks</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Frequency</span>
+                  </div>
+                  <p className="text-lg font-bold">{selectedPlan.duration.daysPerWeek} days/week</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Session</span>
+                  </div>
+                  <p className="text-lg font-bold">{selectedPlan.duration.minutesPerSession} min</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Enrolled</span>
+                  </div>
+                  <p className="text-lg font-bold">{selectedPlan.totalEnrollments}</p>
+                </div>
+              </div>
+
+              {/* Difficulty & Category */}
+              <div>
+                <h4 className="font-heading font-bold mb-2">Level & Category</h4>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className={getDifficultyColor(selectedPlan.difficulty)}>
+                    {selectedPlan.difficulty.charAt(0).toUpperCase() + selectedPlan.difficulty.slice(1)}
+                  </Badge>
+                  <Badge variant="outline">
+                    {selectedPlan.category.charAt(0).toUpperCase() + selectedPlan.category.slice(1).replace("-", " ")}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Goals */}
+              {selectedPlan.goals.length > 0 && (
+                <div>
+                  <h4 className="font-heading font-bold mb-2">Fitness Goals</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPlan.goals.map((goal) => (
+                      <Badge key={goal} variant="secondary">
+                        {goal.charAt(0).toUpperCase() + goal.slice(1).replace("-", " ")}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Equipment */}
+              {selectedPlan.equipment.length > 0 && !selectedPlan.equipment.includes("none") && (
+                <div>
+                  <h4 className="font-heading font-bold mb-2">Equipment Needed</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPlan.equipment.map((item) => (
+                      <Badge key={item} variant="outline">
+                        {item.charAt(0).toUpperCase() + item.slice(1).replace("-", " ")}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All Workouts */}
+              {selectedPlan.workouts.length > 0 && (
+                <div>
+                  <h4 className="font-heading font-bold mb-3">Complete Workout Schedule</h4>
+                  <div className="space-y-3">
+                    {selectedPlan.workouts.map((workout, index) => (
+                      <div key={index} className="p-4 border border-border rounded-lg">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className="text-xs">
+                                Week {workout.week} • Day {workout.day}
+                              </Badge>
+                            </div>
+                            <h5 className="font-heading font-bold">{workout.name}</h5>
+                            <p className="text-sm text-muted-foreground">{workout.description}</p>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground">
+                            <div>{workout.estimatedDuration} min</div>
+                            <div>{workout.estimatedCalories} cal</div>
+                          </div>
+                        </div>
+                        
+                        {workout.exercises.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-border">
+                            <div className="text-sm font-medium mb-2">Exercises ({workout.exercises.length}):</div>
+                            <div className="grid gap-2">
+                              {workout.exercises.map((exercise, exIndex) => (
+                                <div key={exIndex} className="flex items-center gap-2 text-sm">
+                                  <Dumbbell className="w-3 h-3 text-muted-foreground" />
+                                  <span className="font-medium">{exercise.exerciseId.name}</span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="text-muted-foreground">
+                                    {exercise.sets} sets
+                                    {exercise.reps && ` × ${exercise.reps} reps`}
+                                    {exercise.duration && ` × ${exercise.duration}s`}
+                                    {exercise.weight && ` @ ${exercise.weight}kg`}
+                                  </span>
+                                  <div className="flex gap-1 ml-auto">
+                                    {exercise.exerciseId.muscleGroups.slice(0, 2).map((muscle) => (
+                                      <Badge key={muscle} variant="secondary" className="text-xs">
+                                        {muscle}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rating */}
+              <div>
+                <h4 className="font-heading font-bold mb-2">Rating</h4>
+                <div className="flex items-center gap-4">
+                  {renderStars(selectedPlan.averageRating)}
+                  <span className="text-sm text-muted-foreground">
+                    Based on {selectedPlan.totalRatings} {selectedPlan.totalRatings === 1 ? 'review' : 'reviews'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Creator */}
+              <div className="text-sm text-muted-foreground">
+                Created by: {selectedPlan.createdBy.name} ({selectedPlan.createdBy.userType})
+              </div>
+
+              {/* Action Button */}
+              <div className="flex gap-2 pt-4 border-t border-border">
+                <Button 
+                  onClick={() => {
+                    handleEnrollInPlan(selectedPlan._id);
+                    setSelectedPlan(null);
+                  }}
+                  className="flex-1"
+                >
+                  Enroll in This Plan
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setSelectedPlan(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

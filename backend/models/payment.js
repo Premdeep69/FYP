@@ -50,12 +50,20 @@ const paymentSchema = new mongoose.Schema(
       sessionDuration: Number,
       subscriptionPlan: String,
       refundReason: String,
+      notes: String,
     },
     stripeWebhookData: {
       type: mongoose.Schema.Types.Mixed,
     },
     refundedAt: Date,
     refundAmount: Number,
+    refundId: String,
+    refundReason: String,
+    // Invoice fields
+    invoiceUrl: String,
+    invoiceNumber: String,
+    invoiceGeneratedAt: Date,
+    paymentMethod: String,
   },
   { timestamps: true }
 );
@@ -64,5 +72,6 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ userId: 1, status: 1 });
 paymentSchema.index({ trainerId: 1, status: 1 });
 paymentSchema.index({ stripePaymentIntentId: 1 });
+paymentSchema.index({ invoiceNumber: 1 });
 
 export default mongoose.model("Payment", paymentSchema);

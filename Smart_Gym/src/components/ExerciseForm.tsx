@@ -30,6 +30,7 @@ const ExerciseForm: React.FC<ExerciseFormProps> = ({ onExerciseCreated }) => {
     instructions: [{ step: 1, description: "" }],
     tips: [] as string[],
     warnings: [] as string[],
+    videoUrl: "",
     defaultSets: 3,
     defaultReps: 10,
     defaultDuration: 0,
@@ -85,6 +86,7 @@ const ExerciseForm: React.FC<ExerciseFormProps> = ({ onExerciseCreated }) => {
         instructions: formData.instructions.filter(inst => inst.description.trim()),
         tips: formData.tips,
         warnings: formData.warnings,
+        videoUrl: formData.videoUrl || undefined,
         metrics: {
           defaultSets: formData.defaultSets,
           defaultReps: formData.defaultReps,
@@ -116,6 +118,7 @@ const ExerciseForm: React.FC<ExerciseFormProps> = ({ onExerciseCreated }) => {
         instructions: [{ step: 1, description: "" }],
         tips: [],
         warnings: [],
+        videoUrl: "",
         defaultSets: 3,
         defaultReps: 10,
         defaultDuration: 0,
@@ -254,6 +257,19 @@ const ExerciseForm: React.FC<ExerciseFormProps> = ({ onExerciseCreated }) => {
               placeholder="Describe the exercise and its benefits..."
               required
             />
+          </div>
+
+          <div>
+            <Label htmlFor="videoUrl">Tutorial Video URL (YouTube)</Label>
+            <Input
+              id="videoUrl"
+              value={formData.videoUrl}
+              onChange={(e) => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Paste a YouTube video URL to show a tutorial for this exercise
+            </p>
           </div>
 
           <div>

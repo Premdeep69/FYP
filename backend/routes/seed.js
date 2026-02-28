@@ -169,6 +169,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["chest", "shoulders", "triceps"],
         equipment: ["none"],
         difficulty: "beginner",
+        videoUrl: "https://www.youtube.com/watch?v=IODxDxX7oi4",
         instructions: [
           { step: 1, description: "Start in a plank position with hands slightly wider than shoulder-width" },
           { step: 2, description: "Keep your body in a straight line from head to heels" },
@@ -195,6 +196,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["quadriceps", "hamstrings", "glutes"],
         equipment: ["none"],
         difficulty: "beginner",
+        videoUrl: "https://www.youtube.com/watch?v=aclHkVaku9U",
         instructions: [
           { step: 1, description: "Stand with feet shoulder-width apart" },
           { step: 2, description: "Keep chest up and core engaged" },
@@ -221,6 +223,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["hamstrings", "glutes", "back", "traps"],
         equipment: ["barbell"],
         difficulty: "advanced",
+        videoUrl: "https://www.youtube.com/watch?v=op9kVnSso6Q",
         instructions: [
           { step: 1, description: "Stand with feet hip-width apart, bar over mid-foot" },
           { step: 2, description: "Bend down and grip the bar just outside your legs" },
@@ -249,6 +252,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["abs", "core"],
         equipment: ["none"],
         difficulty: "beginner",
+        videoUrl: "https://www.youtube.com/watch?v=pSHjTRCQxIw",
         instructions: [
           { step: 1, description: "Start in forearm plank position" },
           { step: 2, description: "Keep body in straight line from head to heels" },
@@ -275,6 +279,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["full-body"],
         equipment: ["none"],
         difficulty: "intermediate",
+        videoUrl: "https://www.youtube.com/watch?v=TU8QYVW0gDU",
         instructions: [
           { step: 1, description: "Start standing with feet shoulder-width apart" },
           { step: 2, description: "Drop into a squat and place hands on floor" },
@@ -301,6 +306,7 @@ router.post("/sample-data", async (req, res) => {
         muscleGroups: ["core", "shoulders"],
         equipment: ["none"],
         difficulty: "intermediate",
+        videoUrl: "https://www.youtube.com/watch?v=nmwgirgXLYM",
         instructions: [
           { step: 1, description: "Start in plank position" },
           { step: 2, description: "Bring right knee toward chest" },

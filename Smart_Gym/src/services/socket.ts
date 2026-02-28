@@ -56,23 +56,37 @@ class SocketService {
   connect(token: string) {
     this.token = token;
     
+    // Disconnect existing connection if any
+    if (this.socket?.connected) {
+      this.socket.disconnect();
+    }
+    
     this.socket = io('http://localhost:5000', {
       auth: {
         token: token,
       },
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     this.socket.on('connect', () => {
       console.log('Connected to WebSocket server');
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from WebSocket server');
+    this.socket.on('disconnect', (reason) => {
+      console.log('Disconnected from WebSocket server:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('WebSocket connection error:', error);
+      console.error('WebSocket connection error:', error.message);
+      
+      // If authentication error, don't retry
+      if (error.message.includes('Authentication error')) {
+        console.log('Authentication failed. Please log in again.');
+        this.disconnect();
+      }
     });
 
     return this.socket;
