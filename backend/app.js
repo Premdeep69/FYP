@@ -10,6 +10,9 @@ import exerciseRoutes from "./routes/exercise.js";
 import workoutRoutes from "./routes/workout.js";
 import seedRoutes from "./routes/seed.js";
 import notificationRoutes from "./routes/notification.js";
+import bookingRoutes from "./routes/booking.js";
+import sessionSlotRoutes from "./routes/sessionSlot.js";
+import adminRoutes from "./routes/admin.js";
 
 dotenv.config();
 
@@ -27,7 +30,7 @@ app.use(cors({
 // Raw body parser for Stripe webhooks (must be before express.json())
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -38,6 +41,9 @@ app.use("/api/exercises", exerciseRoutes);
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/seed", seedRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/session-slots", sessionSlotRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health check route
 app.get("/", (req, res) => {

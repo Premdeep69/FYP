@@ -97,11 +97,28 @@ const SubscriptionPlans: React.FC = () => {
         });
       }
     } catch (error: any) {
-      toast({
-        title: 'Subscription Failed',
-        description: error.message || 'Failed to create subscription',
-        variant: 'destructive',
-      });
+      console.error('Subscription error:', error);
+      
+      // Check for configuration errors
+      if (error.message?.includes('not configured') || error.message?.includes('authentication failed')) {
+        toast({
+          title: 'Payment System Not Configured',
+          description: 'Stripe payment system needs to be configured. Please contact the administrator or check STRIPE_SETUP_GUIDE.md',
+          variant: 'destructive',
+        });
+      } else if (error.message?.includes('Invalid Stripe price ID')) {
+        toast({
+          title: 'Configuration Error',
+          description: 'Subscription plans need to be configured in Stripe. Please check STRIPE_SETUP_GUIDE.md',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Subscription Failed',
+          description: error.message || 'Failed to create subscription',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(null);
     }

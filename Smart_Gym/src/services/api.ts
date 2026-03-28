@@ -5,7 +5,15 @@ export interface User {
   _id?: string;
   name: string;
   email: string;
-  userType: 'user' | 'trainer';
+  userType: 'user' | 'trainer' | 'admin';
+  isVerified?: boolean;
+  isActive?: boolean;
+  trainerVerification?: {
+    status: 'pending' | 'verified' | 'rejected';
+    submittedAt?: string;
+    reviewedAt?: string;
+    reviewNotes?: string;
+  };
 }
 
 export interface AuthResponse {
@@ -18,7 +26,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  userType: 'user' | 'trainer';
+  userType: 'user' | 'trainer' | 'admin';
 }
 
 export interface LoginData {
@@ -715,10 +723,6 @@ class ApiService {
 
     return response.json();
   }
-}
-
-export const apiService = new ApiService();
-
 
   // Payment Methods
   async getPaymentMethods(): Promise<any> {
@@ -834,3 +838,623 @@ export const apiService = new ApiService();
 
     return response.json();
   }
+
+  // Booking API methods
+  async getAllTrainers(params?: {
+    specialization?: string;
+    minRating?: number;
+    maxPrice?: number;
+    search?: string;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainers');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerById(trainerId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers/${trainerId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer details');
+    }
+
+    return response.json();
+  }
+
+  async getAvailableSlots(trainerId: string, date: string, duration?: number): Promise<any> {
+    const queryParams = new URLSearchParams({ date });
+    if (duration) {
+      queryParams.append('duration', duration.toString());
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers/${trainerId}/slots?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get available slots');
+    }
+
+    return response.json();
+  }
+
+  async createBooking(bookingData: {
+    trainerId: string;
+    sessionType: string;
+    scheduledDate: string;
+    startTime: string;
+    duration: number;
+    notes?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(bookingData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create booking');
+    }
+
+    return response.json();
+  }
+
+  async getUserBookings(params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/my-bookings?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get bookings');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerBookings(params?: {
+    status?: string;
+    date?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/bookings?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer bookings');
+    }
+
+    return response.json();
+  }
+
+  async updateBookingStatus(bookingId: string, status: string, reason?: string, trainerNotes?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ status, reason, trainerNotes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update booking status');
+    }
+
+    return response.json();
+  }
+
+  async addBookingFeedback(bookingId: string, rating: number, comment: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/feedback`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ rating, comment }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add feedback');
+    }
+
+    return response.json();
+  }
+
+  async updateTrainerAvailability(availability: any[]): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/availability`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ availability }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update availability');
+    }
+
+    return response.json();
+  }
+
+  async addBlockedSlot(slotData: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    reason?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/blocked-slots`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(slotData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add blocked slot');
+    }
+
+    return response.json();
+  }
+
+  async updateTrainerPricing(pricingData: {
+    sessionTypes?: any[];
+    hourlyRate?: number;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/pricing`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(pricingData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update pricing');
+    }
+
+    return response.json();
+  }
+
+  async getBookingStats(startDate?: string, endDate?: string): Promise<any> {
+    let url = `${API_BASE_URL}/bookings/trainer/stats`;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get booking stats');
+    }
+
+    return response.json();
+  }
+
+  async confirmBookingPayment(bookingId: string, paymentIntentId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/confirm-payment`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ paymentIntentId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to confirm payment');
+    }
+
+    return response.json();
+  }
+
+  async cancelBookingWithRefund(bookingId: string, reason?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel-with-refund`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cancel booking');
+    }
+
+    return response.json();
+  }
+
+  // Session Slot API methods
+  async createSessionSlot(slotData: any): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(slotData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create session slot');
+    }
+
+    return response.json();
+  }
+
+  async getAllSessionSlots(params?: {
+    trainerId?: string;
+    sessionType?: string;
+    mode?: string;
+    status?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/session-slots?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get session slots');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerSessionSlots(params?: {
+    status?: string;
+    date?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/session-slots/trainer/my-slots?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer session slots');
+    }
+
+    return response.json();
+  }
+
+  async getSessionSlotById(slotId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get session slot');
+    }
+
+    return response.json();
+  }
+
+  async updateSessionSlot(slotId: string, updates: any): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update session slot');
+    }
+
+    return response.json();
+  }
+
+  async cancelSessionSlot(slotId: string, reason?: string, notifyParticipants = true): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/cancel`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason, notifyParticipants }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cancel session slot');
+    }
+
+    return response.json();
+  }
+
+  async deleteSessionSlot(slotId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete session slot');
+    }
+
+    return response.json();
+  }
+
+  async bookSessionSlot(slotId: string, notes?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to book session slot');
+    }
+
+    return response.json();
+  }
+
+  async getSlotStatistics(startDate?: string, endDate?: string): Promise<any> {
+    let url = `${API_BASE_URL}/session-slots/trainer/statistics`;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get slot statistics');
+    }
+
+    return response.json();
+  }
+
+  async duplicateSessionSlot(slotId: string, date: string, startTime?: string, endTime?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/duplicate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ date, startTime, endTime }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to duplicate session slot');
+    }
+
+    return response.json();
+  }
+
+  async getMeetingInfo(slotId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/meeting-info`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get meeting info');
+    }
+
+    return response.json();
+  }
+
+  async regenerateVideoCallRoom(slotId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/regenerate-room`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to regenerate video call room');
+    }
+
+    return response.json();
+  }
+
+  // Get available session slots for a trainer on a specific date (for booking)
+  async getAvailableSessionSlots(trainerId: string, date?: string, sessionType?: string): Promise<any> {
+    let url = `${API_BASE_URL}/session-slots?trainerId=${trainerId}&status=available`;
+    
+    if (date) {
+      url += `&date=${date}`;
+    }
+    
+    if (sessionType) {
+      url += `&sessionType=${sessionType}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get session slots');
+    }
+
+    return response.json();
+  }
+
+  // Book a session slot directly
+  async bookSessionSlot(slotId: string, notes?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to book session slot');
+    }
+
+    return response.json();
+  }
+
+  async updateProfile(data: {
+    name?: string;
+    bio?: string;
+    age?: number | string;
+    height?: number | string;
+    weight?: number | string;
+    fitnessLevel?: string;
+    goals?: string[];
+    avatar?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/profile`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update profile');
+    }
+    return response.json();
+  }
+
+  async updateTrainerProfile(data: {
+    name?: string;
+    bio?: string;
+    specializations?: string[];
+    certifications?: string[];
+    experience?: number | string;
+    hourlyRate?: number | string;
+    avatar?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/trainer-profile`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update profile');
+    }
+    return response.json();
+  }
+
+  // Admin API methods
+  async getAdminStats(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to get admin stats');
+    return response.json();
+  }
+
+  async getAdminUsers(params?: { page?: number; limit?: number; search?: string; userType?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
+    const response = await fetch(`${API_BASE_URL}/admin/users?${queryParams}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get users');
+    return response.json();
+  }
+
+  async getAdminTrainers(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get trainers');
+    return response.json();
+  }
+
+  async getPendingTrainers(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/pending`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get pending trainers');
+    return response.json();
+  }
+
+  async verifyTrainer(trainerId: string, notes?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/verify`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async rejectTrainer(trainerId: string, notes?: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/reject`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async getAdminPayments(params?: { page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; search?: string; sortBy?: string; sortOrder?: string }): Promise<any> {
+    const queryParams = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
+    const response = await fetch(`${API_BASE_URL}/admin/payments?${queryParams}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get payments');
+    return response.json();
+  }
+
+  async getAdminPaymentById(paymentId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/payments/${paymentId}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get payment');
+    return response.json();
+  }
+
+  async toggleUserActive(userId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/toggle-active`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async adminAddTrainer(data: any): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+}
+
+export const apiService = new ApiService();

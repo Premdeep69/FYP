@@ -18,7 +18,6 @@ const paymentSchema = new mongoose.Schema(
     stripePaymentIntentId: {
       type: String,
       required: true,
-      unique: true,
     },
     stripeCustomerId: {
       type: String,
@@ -71,7 +70,7 @@ const paymentSchema = new mongoose.Schema(
 // Index for efficient queries
 paymentSchema.index({ userId: 1, status: 1 });
 paymentSchema.index({ trainerId: 1, status: 1 });
-paymentSchema.index({ stripePaymentIntentId: 1 });
+paymentSchema.index({ stripePaymentIntentId: 1 }, { unique: true });
 paymentSchema.index({ invoiceNumber: 1 });
 
 export default mongoose.model("Payment", paymentSchema);

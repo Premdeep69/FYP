@@ -827,3 +827,108 @@ export const deleteWorkout = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Update user profile
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      name,
+      bio,
+      age,
+      height,
+      weight,
+      fitnessLevel,
+      goals,
+      avatar, // base64 data URL
+    } = req.body;
+
+    const updateFields = {};
+
+    if (name) updateFields.name = name.trim();
+    if (bio !== undefined) updateFields["profile.bio"] = bio;
+    if (age !== undefined) updateFields["profile.age"] = age ? Number(age) : undefined;
+    if (height !== undefined) updateFields["profile.height"] = height ? Number(height) : undefined;
+    if (weight !== undefined) updateFields["profile.weight"] = weight ? Number(weight) : undefined;
+    if (fitnessLevel) updateFields["profile.fitnessLevel"] = fitnessLevel;
+    if (goals) updateFields["profile.goals"] = goals;
+    if (avatar !== undefined) updateFields["profile.avatar"] = avatar;
+
+    // Remove undefined values
+    Object.keys(updateFields).forEach(
+      (k) => updateFields[k] === undefined && delete updateFields[k]
+    );
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        trainerVerification: user.trainerVerification,
+        profile: user.profile,
+        trainerProfile: user.trainerProfile,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update trainer profile
+export const updateTrainerProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      name,
+      bio,
+      specializations,
+      certifications,
+      experience,
+      hourlyRate,
+      avatar,
+    } = req.body;
+
+    const updateFields = {};
+
+    if (name) updateFields.name = name.trim();
+    if (bio !== undefined) updateFields["trainerProfile.bio"] = bio;
+    if (specializations) updateFields["trainerProfile.specializations"] = specializations;
+    if (certifications) updateFields["trainerProfile.certifications"] = certifications;
+    if (experience !== undefined) updateFields["trainerProfile.experience"] = Number(experience);
+    if (hourlyRate !== undefined) updateFields["trainerProfile.hourlyRate"] = Number(hourlyRate);
+    if (avatar !== undefined) updateFields["trainerProfile.profileImage"] = avatar;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true }
+    ).select("-password");
+
+    res.json({
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        trainerVerification: user.trainerVerification,
+        profile: user.profile,
+        trainerProfile: user.trainerProfile,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

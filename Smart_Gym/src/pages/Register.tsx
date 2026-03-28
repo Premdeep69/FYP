@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Upload, FileText, File, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -38,6 +38,15 @@ const Register = () => {
   const [experience, setExperience] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [bio, setBio] = useState("");
+
+  // Verification documents (trainer only)
+  interface DocFile { name: string; type: string; size: number; data: string; }
+  const [documents, setDocuments] = useState<DocFile[]>([]);
+  const [docDragging, setDocDragging] = useState(false);
+
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+  const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB per file
+  const MAX_FILES = 5;
 
   const commonGoals = [
     "Weight Loss",
@@ -94,6 +103,45 @@ const Register = () => {
     setCertifications(certifications.filter(c => c !== cert));
   };
 
+  const processFiles = (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    const remaining = MAX_FILES - documents.length;
+    if (remaining <= 0) {
+      toast({ title: "Limit reached", description: `Maximum ${MAX_FILES} documents allowed.`, variant: "destructive" });
+      return;
+    }
+    arr.slice(0, remaining).forEach(file => {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast({ title: "Invalid file type", description: `${file.name}: only PDF, JPG, PNG allowed.`, variant: "destructive" });
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast({ title: "File too large", description: `${file.name}: max 3MB per file.`, variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setDocuments(prev => [...prev, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: reader.result as string,
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeDocument = (index: number) => {
+    setDocuments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -134,6 +182,14 @@ const Register = () => {
         });
         return;
       }
+      if (documents.length === 0) {
+        toast({
+          title: "Documents Required",
+          description: "Please upload at least one verification document (certification or proof of achievement).",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -163,6 +219,7 @@ const Register = () => {
         registrationData.certifications = certifications;
         registrationData.experience = experience;
         if (hourlyRate) registrationData.hourlyRate = hourlyRate;
+        registrationData.documents = documents; // verification docs
       }
 
       await register(
@@ -175,11 +232,13 @@ const Register = () => {
       
       toast({
         title: "Account Created",
-        description: "Welcome! Your account has been created successfully.",
+        description: userType === "trainer"
+          ? "Your trainer account is pending admin approval."
+          : "Welcome! Your account has been created successfully.",
       });
       
       if (userType === "trainer") {
-        navigate("/trainer-dashboard");
+        navigate("/pending-approval");
       } else {
         navigate("/user-dashboard");
       }
@@ -487,6 +546,77 @@ const Register = () => {
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
+              </div>
+
+              {/* Verification Documents */}
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Label className="text-base font-semibold">Verification Documents *</Label>
+                  <Badge variant="destructive" className="text-xs">Required</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Upload certifications, diplomas, or proof of achievements. Accepted: PDF, JPG, PNG · Max 3MB each · Up to 5 files.
+                </p>
+
+                {/* Drop zone */}
+                <div
+                  onDragOver={e => { e.preventDefault(); setDocDragging(true); }}
+                  onDragLeave={() => setDocDragging(false)}
+                  onDrop={e => { e.preventDefault(); setDocDragging(false); processFiles(e.dataTransfer.files); }}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                    docDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                  }`}
+                  onClick={() => document.getElementById('doc-upload')?.click()}
+                >
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-medium">Drop files here or click to browse</p>
+                  <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG up to 3MB</p>
+                  <input
+                    id="doc-upload"
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={e => e.target.files && processFiles(e.target.files)}
+                  />
+                </div>
+
+                {/* File list */}
+                {documents.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {documents.map((doc, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                        {doc.type === 'application/pdf'
+                          ? <FileText className="w-5 h-5 text-red-500 shrink-0" />
+                          : <File className="w-5 h-5 text-blue-500 shrink-0" />}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatBytes(doc.size)}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDocument(i)}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {documents.length === 0 && (
+                  <div className="flex items-center gap-2 mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0" />
+                    <p className="text-xs text-yellow-700">At least one document is required for trainer verification.</p>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground mt-2">
+                  {documents.length}/{MAX_FILES} files uploaded
+                </p>
               </div>
             </div>
           )}

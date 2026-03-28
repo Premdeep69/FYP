@@ -6,8 +6,9 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, userType: 'user' | 'trainer', additionalData?: any) => Promise<void>;
+  register: (name: string, email: string, password: string, userType: 'user' | 'trainer' | 'admin', additionalData?: any) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   loading: boolean;
 }
 
@@ -37,9 +38,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (storedToken && storedUser) {
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-        
-        // Connect to WebSocket
+        // Fetch fresh user data from server to get latest verification status
+        try {
+          const freshUser = await apiService.getCurrentUser();
+          setUser(freshUser);
+          localStorage.setItem('user', JSON.stringify(freshUser));
+        } catch {
+          setUser(JSON.parse(storedUser));
+        }
         socketService.connect(storedToken);
       }
       
@@ -48,7 +54,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initAuth();
 
-    // Cleanup on unmount
     return () => {
       socketService.disconnect();
     };
@@ -71,7 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (name: string, email: string, password: string, userType: 'user' | 'trainer', additionalData?: any) => {
+  const register = async (name: string, email: string, password: string, userType: 'user' | 'trainer' | 'admin', additionalData?: any) => {
     try {
       const registrationPayload = additionalData || { name, email, password, userType };
       const response = await apiService.register(registrationPayload);
@@ -94,9 +99,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
-    
-    // Disconnect from WebSocket
     socketService.disconnect();
+  };
+
+  const refreshUser = async () => {
+    try {
+      const freshUser = await apiService.getCurrentUser();
+      setUser(freshUser);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+    } catch {
+      // silently fail
+    }
   };
 
   const value = {
@@ -105,6 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    refreshUser,
     loading,
   };
 

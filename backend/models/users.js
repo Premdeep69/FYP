@@ -19,8 +19,29 @@ const userSchema = new mongoose.Schema(
     },
     userType: {
       type: String,
-      enum: ["user", "trainer"],
+      enum: ["user", "trainer", "admin"],
       default: "user",
+    },
+    trainerVerification: {
+      status: {
+        type: String,
+        enum: ["pending", "verified", "rejected"],
+        default: "pending",
+      },
+      documents: [{
+        name: String,
+        type: String,   // mime type
+        size: Number,   // bytes
+        data: String,   // base64 data URL
+        uploadedAt: { type: Date, default: Date.now },
+      }],
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewNotes: String,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
     },
     profile: {
       avatar: String,
@@ -50,15 +71,38 @@ const userSchema = new mongoose.Schema(
       certifications: [String],
       experience: Number, // years
       hourlyRate: Number,
+      sessionTypes: [{
+        type: {
+          type: String,
+          enum: ["personal-training", "group-class", "consultation", "follow-up"],
+        },
+        duration: Number, // minutes
+        price: Number,
+        description: String,
+      }],
       availability: [{
-        day: String,
+        day: {
+          type: String,
+          enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+        },
+        startTime: String, // HH:MM format
+        endTime: String, // HH:MM format
+        isAvailable: { type: Boolean, default: true },
+      }],
+      blockedSlots: [{
+        date: Date,
         startTime: String,
         endTime: String,
+        reason: String,
       }],
       rating: {
         average: { type: Number, default: 0 },
         count: { type: Number, default: 0 },
       },
+      totalSessions: { type: Number, default: 0 },
+      completedSessions: { type: Number, default: 0 },
+      bio: String,
+      profileImage: String,
     },
     // Activity tracking
     stats: {
@@ -118,5 +162,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// ALL HOOKS COMPLETELY REMOVED FOR DEBUGGING
+// Synchronization handled entirely by syncService events from controllers
 
 export default mongoose.model("User", userSchema);
