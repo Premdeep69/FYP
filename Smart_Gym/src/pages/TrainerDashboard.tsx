@@ -1,31 +1,108 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, DollarSign, Users, Star, Clock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiService, TrainerDashboardData } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const TrainerDashboard = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [dashboardData, setDashboardData] = useState<TrainerDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is actually a trainer (not a regular user)
+    if (user && user.userType !== 'trainer') {
+      toast({
+        title: "Access Denied",
+        description: "This dashboard is for trainers only.",
+        variant: "destructive",
+      });
+      window.location.href = '/user-dashboard';
+      return;
+    }
+    
+    fetchDashboardData();
+  }, [user]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const data = await apiService.getTrainerDashboard();
+      setDashboardData(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen py-12 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="min-h-screen py-12 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Failed to load dashboard data</p>
+          <Button onClick={fetchDashboardData} className="mt-4">Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
   const stats = [
-    { label: "Active Clients", value: "24", icon: Users, color: "text-primary" },
-    { label: "This Month", value: "$3,200", icon: DollarSign, color: "text-success" },
-    { label: "Avg Rating", value: "4.9", icon: Star, color: "text-warning" },
-    { label: "Sessions Today", value: "6", icon: Clock, color: "text-secondary" },
-  ];
-
-  const upcomingSessions = [
-    { client: "John Doe", time: "2:00 PM", type: "Strength Training", status: "confirmed" },
-    { client: "Jane Smith", time: "3:30 PM", type: "HIIT", status: "confirmed" },
-    { client: "Mike Johnson", time: "5:00 PM", type: "Personal Training", status: "pending" },
-    { client: "Sarah Williams", time: "6:30 PM", type: "Yoga", status: "confirmed" },
-  ];
-
-  const recentClients = [
-    { name: "Emily Brown", plan: "Weight Loss", progress: 85, lastSession: "Today" },
-    { name: "David Lee", plan: "Muscle Gain", progress: 70, lastSession: "Yesterday" },
-    { name: "Lisa Chen", plan: "General Fitness", progress: 60, lastSession: "2 days ago" },
+    { 
+      label: "Active Clients", 
+      value: dashboardData.stats.activeClients.toString(), 
+      icon: Users, 
+      color: "text-primary" 
+    },
+    { 
+      label: "This Month", 
+      value: `$${dashboardData.stats.monthlyEarnings.toFixed(0)}`, 
+      icon: DollarSign, 
+      color: "text-success" 
+    },
+    { 
+      label: "Avg Rating", 
+      value: dashboardData.stats.rating.toFixed(1), 
+      icon: Star, 
+      color: "text-warning" 
+    },
+    { 
+      label: "Sessions Today", 
+      value: dashboardData.stats.todaySessions.toString(), 
+      icon: Clock, 
+      color: "text-secondary" 
+    },
   ];
 
   const getStatusColor = (status: string) => {
-    return status === "confirmed" ? "bg-success/10 text-success" : "bg-warning/10 text-warning";
+    switch (status) {
+      case "confirmed":
+        return "bg-success/10 text-success";
+      case "scheduled":
+        return "bg-primary/10 text-primary";
+      case "completed":
+        return "bg-secondary/10 text-secondary";
+      default:
+        return "bg-warning/10 text-warning";
+    }
   };
 
   return (
@@ -58,56 +135,64 @@ const TrainerDashboard = () => {
               </Button>
             </div>
             <div className="space-y-4">
-              {upcomingSessions.map((session, index) => (
-                <div key={index} className="p-4 bg-muted rounded-lg">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="font-medium">{session.client}</h4>
-                      <p className="text-sm text-muted-foreground">{session.type}</p>
+              {dashboardData.todaySessions.length > 0 ? (
+                dashboardData.todaySessions.map((session: any, index: number) => (
+                  <div key={index} className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-medium">{session.clientId?.name || 'Unknown Client'}</h4>
+                        <p className="text-sm text-muted-foreground">{session.sessionType}</p>
+                      </div>
+                      <Badge className={getStatusColor(session.status)}>
+                        {session.status}
+                      </Badge>
                     </div>
-                    <Badge className={getStatusColor(session.status)}>
-                      {session.status}
-                    </Badge>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="w-4 h-4" />
+                      {new Date(session.scheduledDate).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    {session.time}
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No sessions scheduled for today</p>
                 </div>
-              ))}
+              )}
             </div>
           </Card>
 
-          {/* Recent Clients */}
+          {/* Active Clients */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-heading font-bold">Active Clients</h3>
               <Button variant="outline" size="sm">View All</Button>
             </div>
             <div className="space-y-4">
-              {recentClients.map((client, index) => (
-                <div key={index} className="p-4 bg-muted rounded-lg">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-medium">{client.name}</h4>
-                      <p className="text-sm text-muted-foreground">{client.plan}</p>
+              {dashboardData.activeClients.length > 0 ? (
+                dashboardData.activeClients.slice(0, 5).map((client: any, index: number) => (
+                  <div key={index} className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-medium">{client.name}</h4>
+                        <p className="text-sm text-muted-foreground">{client.totalSessions} sessions</p>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(client.lastSession).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{client.lastSession}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{client.progress}%</span>
-                    </div>
-                    <div className="h-2 bg-background rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${client.progress}%` }}
-                      />
+                    <div className="text-sm text-muted-foreground">
+                      Total earned: ${client.totalEarnings?.toFixed(0) || '0'}
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No active clients yet</p>
                 </div>
-              ))}
+              )}
             </div>
           </Card>
         </div>
@@ -116,17 +201,22 @@ const TrainerDashboard = () => {
         <Card className="p-6 mt-6">
           <h3 className="text-xl font-heading font-bold mb-6">Earnings Summary</h3>
           <div className="grid md:grid-cols-4 gap-6">
-            {[
-              { period: "Today", amount: "$450" },
-              { period: "This Week", amount: "$1,800" },
-              { period: "This Month", amount: "$3,200" },
-              { period: "Total", amount: "$28,500" },
-            ].map((earning, index) => (
-              <div key={index} className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">{earning.period}</p>
-                <p className="text-2xl font-heading font-bold">{earning.amount}</p>
-              </div>
-            ))}
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Today</p>
+              <p className="text-2xl font-heading font-bold">${dashboardData.stats.todayEarnings.toFixed(0)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">This Month</p>
+              <p className="text-2xl font-heading font-bold">${dashboardData.stats.monthlyEarnings.toFixed(0)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Active Clients</p>
+              <p className="text-2xl font-heading font-bold">{dashboardData.stats.activeClients}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">Rating</p>
+              <p className="text-2xl font-heading font-bold">{dashboardData.stats.rating.toFixed(1)} ⭐</p>
+            </div>
           </div>
         </Card>
 
