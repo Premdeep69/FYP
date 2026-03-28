@@ -20,10 +20,16 @@ const Navbar = () => {
     { name: "Home", path: "/" },
     { name: "Exercises", path: "/exercises" },
     { name: "Workout Plans", path: "/workout-plans" },
-    ...(user && user.userType === "user" ? [{ name: "My Workouts", path: "/my-workouts" }] : []),
+    ...(user && user.userType === "user" ? [
+      { name: "My Workouts", path: "/my-workouts" },
+      { name: "My Bookings", path: "/my-bookings" }
+    ] : []),
+    ...(user && user.userType === "trainer" ? [
+      { name: "Manage Bookings", path: "/trainer-management" },
+      { name: "Session Slots", path: "/session-slots" }
+    ] : []),
     { name: "Trainers", path: "/trainers" },
     { name: "Chat", path: "/chat" },
-    { name: "Subscription", path: "/subscription" },
   ];
 
   const isActive = (path: string) => location.pathname === path;

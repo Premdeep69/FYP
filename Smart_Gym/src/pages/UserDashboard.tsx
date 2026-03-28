@@ -21,7 +21,10 @@ import {
   Award,
   Dumbbell,
   Heart,
-  Zap
+  Zap,
+  Camera,
+  Save,
+  Edit2
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -53,7 +56,7 @@ import {
 } from "recharts";
 
 const UserDashboard = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const { addNotification } = useNotifications();
   const [dashboardData, setDashboardData] = useState<UserDashboardData | null>(null);
@@ -67,6 +70,21 @@ const UserDashboard = () => {
     caloriesBurned: "",
     notes: ""
   });
+
+  // Profile state
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    bio: "",
+    age: "",
+    height: "",
+    weight: "",
+    fitnessLevel: "beginner",
+    goals: [] as string[],
+    avatar: "",
+  });
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [newGoalInput, setNewGoalInput] = useState("");
 
   const chartConfig = {
     workouts: {
@@ -102,6 +120,18 @@ const UserDashboard = () => {
     try {
       const data = await apiService.getUserDashboard();
       setDashboardData(data);
+      // Populate profile form with current data
+      setProfileForm({
+        name: data.user.name || "",
+        bio: data.user.profile?.bio || "",
+        age: data.user.profile?.age?.toString() || "",
+        height: data.user.profile?.height?.toString() || "",
+        weight: data.user.profile?.weight?.toString() || "",
+        fitnessLevel: data.user.profile?.fitnessLevel || "beginner",
+        goals: data.user.profile?.goals || [],
+        avatar: data.user.profile?.avatar || "",
+      });
+      setAvatarPreview(data.user.profile?.avatar || "");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -164,6 +194,51 @@ const UserDashboard = () => {
         description: error.message || "Failed to log workout",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Image must be under 2MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setAvatarPreview(base64);
+      setProfileForm(prev => ({ ...prev, avatar: base64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profileForm.name.trim()) {
+      toast({ title: "Validation Error", description: "Name is required.", variant: "destructive" });
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const res = await apiService.updateProfile({
+        name: profileForm.name,
+        bio: profileForm.bio,
+        age: profileForm.age || undefined,
+        height: profileForm.height || undefined,
+        weight: profileForm.weight || undefined,
+        fitnessLevel: profileForm.fitnessLevel,
+        goals: profileForm.goals,
+        avatar: profileForm.avatar || undefined,
+      });
+      // Update stored user in localStorage/context
+      localStorage.setItem('user', JSON.stringify(res.user));
+      await refreshUser();
+      toast({ title: "Profile updated", description: "Your changes have been saved." });
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update profile", variant: "destructive" });
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -359,10 +434,11 @@ const UserDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="goals">Goals</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -814,6 +890,238 @@ const UserDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="space-y-6">
+            <div className="max-w-2xl mx-auto space-y-6">
+              {/* Avatar */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><User className="w-5 h-5" /> Profile Picture</CardTitle>
+                  <CardDescription>Upload a photo to personalize your account</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-6">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full overflow-hidden bg-muted border-2 border-border flex items-center justify-center">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-10 h-10 text-muted-foreground" />
+                        )}
+                      </div>
+                      <label
+                        htmlFor="avatar-upload"
+                        className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                      </label>
+                      <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{dashboardData.user.name}</p>
+                      <p className="text-sm text-muted-foreground">{dashboardData.user.email}</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF · Max 2MB</p>
+                      {avatarPreview && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 text-destructive hover:text-destructive px-0"
+                          onClick={() => { setAvatarPreview(""); setProfileForm(p => ({ ...p, avatar: "" })); }}
+                        >
+                          Remove photo
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Personal Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Edit2 className="w-5 h-5" /> Personal Details</CardTitle>
+                  <CardDescription>Update your basic information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-name">Full Name *</Label>
+                    <Input
+                      id="profile-name"
+                      value={profileForm.name}
+                      onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="Your full name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="profile-bio">Bio</Label>
+                    <Textarea
+                      id="profile-bio"
+                      value={profileForm.bio}
+                      onChange={e => setProfileForm(p => ({ ...p, bio: e.target.value }))}
+                      placeholder="Tell us a bit about yourself and your fitness journey..."
+                      rows={3}
+                      maxLength={300}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">{profileForm.bio.length}/300</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profile-age">Age</Label>
+                      <Input
+                        id="profile-age"
+                        type="number"
+                        min={13}
+                        max={120}
+                        value={profileForm.age}
+                        onChange={e => setProfileForm(p => ({ ...p, age: e.target.value }))}
+                        placeholder="25"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profile-height">Height (cm)</Label>
+                      <Input
+                        id="profile-height"
+                        type="number"
+                        min={100}
+                        max={250}
+                        value={profileForm.height}
+                        onChange={e => setProfileForm(p => ({ ...p, height: e.target.value }))}
+                        placeholder="170"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profile-weight">Weight (kg)</Label>
+                      <Input
+                        id="profile-weight"
+                        type="number"
+                        min={30}
+                        max={300}
+                        value={profileForm.weight}
+                        onChange={e => setProfileForm(p => ({ ...p, weight: e.target.value }))}
+                        placeholder="70"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Fitness Level</Label>
+                    <Select
+                      value={profileForm.fitnessLevel}
+                      onValueChange={v => setProfileForm(p => ({ ...p, fitnessLevel: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="beginner">Beginner</SelectItem>
+                        <SelectItem value="intermediate">Intermediate</SelectItem>
+                        <SelectItem value="advanced">Advanced</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Fitness Goals */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Target className="w-5 h-5" /> Fitness Goals</CardTitle>
+                  <CardDescription>What are you working towards?</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Quick-select common goals */}
+                  <div className="flex flex-wrap gap-2">
+                    {["Weight Loss", "Muscle Gain", "Improve Endurance", "Increase Flexibility", "General Fitness", "Sports Performance"].map(g => {
+                      const selected = profileForm.goals.includes(g);
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => setProfileForm(p => ({
+                            ...p,
+                            goals: selected ? p.goals.filter(x => x !== g) : [...p.goals, g]
+                          }))}
+                          className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border hover:border-primary/50"
+                          }`}
+                        >
+                          {g}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom goal input */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a custom goal..."
+                      value={newGoalInput}
+                      onChange={e => setNewGoalInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newGoalInput.trim()) {
+                          e.preventDefault();
+                          if (!profileForm.goals.includes(newGoalInput.trim())) {
+                            setProfileForm(p => ({ ...p, goals: [...p.goals, newGoalInput.trim()] }));
+                          }
+                          setNewGoalInput("");
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (newGoalInput.trim() && !profileForm.goals.includes(newGoalInput.trim())) {
+                          setProfileForm(p => ({ ...p, goals: [...p.goals, newGoalInput.trim()] }));
+                          setNewGoalInput("");
+                        }
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Selected goals */}
+                  {profileForm.goals.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {profileForm.goals.map(g => (
+                        <Badge key={g} variant="secondary" className="gap-1 pr-1">
+                          {g}
+                          <button
+                            type="button"
+                            onClick={() => setProfileForm(p => ({ ...p, goals: p.goals.filter(x => x !== g) }))}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Save Button */}
+              <Button onClick={handleSaveProfile} disabled={profileSaving} className="w-full" size="lg">
+                {profileSaving ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Saving...</>
+                ) : (
+                  <><Save className="w-4 h-4 mr-2" /> Save Profile</>
+                )}
+              </Button>
             </div>
           </TabsContent>
 

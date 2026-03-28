@@ -5,7 +5,15 @@ export interface User {
   _id?: string;
   name: string;
   email: string;
-  userType: 'user' | 'trainer';
+  userType: 'user' | 'trainer' | 'admin';
+  isVerified?: boolean;
+  isActive?: boolean;
+  trainerVerification?: {
+    status: 'pending' | 'verified' | 'rejected';
+    submittedAt?: string;
+    reviewedAt?: string;
+    reviewNotes?: string;
+  };
 }
 
 export interface AuthResponse {
@@ -18,7 +26,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  userType: 'user' | 'trainer';
+  userType: 'user' | 'trainer' | 'admin';
 }
 
 export interface LoginData {
@@ -58,8 +66,8 @@ export interface UserDashboardData {
   user: {
     name: string;
     email: string;
-    profile: any;
-    stats: any;
+    profile: unknown;
+    stats: unknown;
   };
   weeklyStats: {
     workoutSessions: number;
@@ -114,7 +122,7 @@ export interface TrainerDashboardData {
   trainer: {
     name: string;
     email: string;
-    trainerProfile: any;
+    trainerProfile: unknown;
   };
   stats: {
     activeClients: number;
@@ -123,8 +131,8 @@ export interface TrainerDashboardData {
     todaySessions: number;
     rating: number;
   };
-  todaySessions: any[];
-  activeClients: any[];
+  todaySessions: unknown[];
+  activeClients: unknown[];
 }
 
 class ApiService {
@@ -207,7 +215,7 @@ class ApiService {
     type: string;
     duration: number;
     caloriesBurned: number;
-    exercises?: any[];
+    exercises?: unknown[];
     notes?: string;
   }): Promise<{ message: string; workout: Workout }> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout`, {
@@ -245,7 +253,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutAnalytics(period: number = 30): Promise<any> {
+  async getWorkoutAnalytics(period: number = 30): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/analytics?period=${period}`, {
       headers: this.getHeaders(),
     });
@@ -263,7 +271,7 @@ class ApiService {
     type?: string;
     startDate?: string;
     endDate?: string;
-  } = {}): Promise<any> {
+  } = {}): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
@@ -282,7 +290,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateWorkout(workoutId: string, updates: any): Promise<any> {
+  async updateWorkout(workoutId: string, updates: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -297,7 +305,7 @@ class ApiService {
     return response.json();
   }
 
-  async deleteWorkout(workoutId: string): Promise<any> {
+  async deleteWorkout(workoutId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -312,7 +320,7 @@ class ApiService {
   }
 
   // Chat API methods
-  async getConversations(): Promise<any[]> {
+  async getConversations(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
       headers: this.getHeaders(),
     });
@@ -324,7 +332,7 @@ class ApiService {
     return response.json();
   }
 
-  async getMessages(conversationId: string, page: number = 1, limit: number = 50): Promise<any[]> {
+  async getMessages(conversationId: string, page: number = 1, limit: number = 50): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`, {
       headers: this.getHeaders(),
     });
@@ -336,7 +344,7 @@ class ApiService {
     return response.json();
   }
 
-  async startConversation(receiverId: string): Promise<any> {
+  async startConversation(receiverId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -351,7 +359,7 @@ class ApiService {
     return response.json();
   }
 
-  async getAvailableUsers(): Promise<any[]> {
+  async getAvailableUsers(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/users`, {
       headers: this.getHeaders(),
     });
@@ -363,7 +371,7 @@ class ApiService {
     return response.json();
   }
 
-  async getOnlineUsers(): Promise<any[]> {
+  async getOnlineUsers(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/online-users`, {
       headers: this.getHeaders(),
     });
@@ -376,7 +384,7 @@ class ApiService {
   }
 
   // Payment API methods
-  async createSessionPayment(sessionId: string, amount: number, trainerId: string): Promise<any> {
+  async createSessionPayment(sessionId: string, amount: number, trainerId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/session`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -391,7 +399,7 @@ class ApiService {
     return response.json();
   }
 
-  async createSubscription(priceId: string, planName: string): Promise<any> {
+  async createSubscription(priceId: string, planName: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/subscription`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -406,7 +414,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPaymentHistory(page: number = 1, limit: number = 10): Promise<any> {
+  async getPaymentHistory(page: number = 1, limit: number = 10): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/history?page=${page}&limit=${limit}`, {
       headers: this.getHeaders(),
     });
@@ -418,7 +426,7 @@ class ApiService {
     return response.json();
   }
 
-  async getUserSubscriptions(): Promise<any[]> {
+  async getUserSubscriptions(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/payment/subscriptions`, {
       headers: this.getHeaders(),
     });
@@ -430,7 +438,7 @@ class ApiService {
     return response.json();
   }
 
-  async cancelSubscription(subscriptionId: string): Promise<any> {
+  async cancelSubscription(subscriptionId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/subscriptions/${subscriptionId}/cancel`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -444,7 +452,7 @@ class ApiService {
     return response.json();
   }
 
-  async getTrainerEarnings(startDate?: string, endDate?: string): Promise<any> {
+  async getTrainerEarnings(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/payment/earnings`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -472,7 +480,7 @@ class ApiService {
     search?: string;
     sortBy?: string;
     sortOrder?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -497,7 +505,7 @@ class ApiService {
     return response.json();
   }
 
-  async getExerciseById(id: string): Promise<any> {
+  async getExerciseById(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       headers: this.getHeaders(),
     });
@@ -509,7 +517,7 @@ class ApiService {
     return response.json();
   }
 
-  async createExercise(exerciseData: any): Promise<any> {
+  async createExercise(exerciseData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -524,7 +532,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateExercise(id: string, exerciseData: any): Promise<any> {
+  async updateExercise(id: string, exerciseData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -539,7 +547,7 @@ class ApiService {
     return response.json();
   }
 
-  async deleteExercise(id: string): Promise<any> {
+  async deleteExercise(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -553,7 +561,7 @@ class ApiService {
     return response.json();
   }
 
-  async getExerciseFilters(): Promise<any> {
+  async getExerciseFilters(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/filters`);
 
     if (!response.ok) {
@@ -563,7 +571,7 @@ class ApiService {
     return response.json();
   }
 
-  async rateExercise(id: string, rating: number): Promise<any> {
+  async rateExercise(id: string, rating: number): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}/rate`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -578,7 +586,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPopularExercises(limit?: number): Promise<any> {
+  async getPopularExercises(limit?: number): Promise<unknown> {
     const url = limit ? `${API_BASE_URL}/exercises/popular?limit=${limit}` : `${API_BASE_URL}/exercises/popular`;
     const response = await fetch(url);
 
@@ -601,7 +609,7 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
     isPremium?: boolean;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -626,7 +634,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutPlanById(id: string): Promise<any> {
+  async getWorkoutPlanById(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/${id}`, {
       headers: this.getHeaders(),
     });
@@ -638,7 +646,7 @@ class ApiService {
     return response.json();
   }
 
-  async createWorkoutPlan(workoutData: any): Promise<any> {
+  async createWorkoutPlan(workoutData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -653,7 +661,7 @@ class ApiService {
     return response.json();
   }
 
-  async enrollInWorkoutPlan(id: string): Promise<any> {
+  async enrollInWorkoutPlan(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/${id}/enroll`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -667,7 +675,7 @@ class ApiService {
     return response.json();
   }
 
-  async getUserWorkoutPlans(status?: string): Promise<any> {
+  async getUserWorkoutPlans(status?: string): Promise<unknown> {
     const url = status ? `${API_BASE_URL}/workouts/user/plans?status=${status}` : `${API_BASE_URL}/workouts/user/plans`;
     const response = await fetch(url, {
       headers: this.getHeaders(),
@@ -680,7 +688,7 @@ class ApiService {
     return response.json();
   }
 
-  async logWorkoutCompletion(progressId: string, workoutData: any): Promise<any> {
+  async logWorkoutCompletion(progressId: string, workoutData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/progress/${progressId}/complete`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -695,7 +703,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutPlanFilters(): Promise<any> {
+  async getWorkoutPlanFilters(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/filters`);
 
     if (!response.ok) {
@@ -705,7 +713,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPopularWorkoutPlans(limit?: number): Promise<any> {
+  async getPopularWorkoutPlans(limit?: number): Promise<unknown> {
     const url = limit ? `${API_BASE_URL}/workouts/popular?limit=${limit}` : `${API_BASE_URL}/workouts/popular`;
     const response = await fetch(url);
 
@@ -715,13 +723,9 @@ class ApiService {
 
     return response.json();
   }
-}
-
-export const apiService = new ApiService();
-
 
   // Payment Methods
-  async getPaymentMethods(): Promise<any> {
+  async getPaymentMethods(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods`, {
       headers: this.getHeaders(),
     });
@@ -733,7 +737,7 @@ export const apiService = new ApiService();
     return response.json();
   }
 
-  async addPaymentMethod(paymentMethodId: string): Promise<any> {
+  async addPaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -748,7 +752,7 @@ export const apiService = new ApiService();
     return response.json();
   }
 
-  async removePaymentMethod(paymentMethodId: string): Promise<any> {
+  async removePaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods/${paymentMethodId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -762,7 +766,7 @@ export const apiService = new ApiService();
     return response.json();
   }
 
-  async setDefaultPaymentMethod(paymentMethodId: string): Promise<any> {
+  async setDefaultPaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods/default`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -778,7 +782,7 @@ export const apiService = new ApiService();
   }
 
   // Invoice Generation
-  async generateInvoice(paymentId: string): Promise<any> {
+  async generateInvoice(paymentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/invoice/${paymentId}`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -805,7 +809,7 @@ export const apiService = new ApiService();
   }
 
   // Payment Statistics
-  async getPaymentStatistics(startDate?: string, endDate?: string): Promise<any> {
+  async getPaymentStatistics(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/payment/statistics`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -823,7 +827,7 @@ export const apiService = new ApiService();
   }
 
   // Payment Verification
-  async verifyPaymentStatus(paymentIntentId: string): Promise<any> {
+  async verifyPaymentStatus(paymentIntentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/verify/${paymentIntentId}`, {
       headers: this.getHeaders(),
     });
@@ -834,3 +838,623 @@ export const apiService = new ApiService();
 
     return response.json();
   }
+
+  // Booking API methods
+  async getAllTrainers(params?: {
+    specialization?: string;
+    minRating?: number;
+    maxPrice?: number;
+    search?: string;
+  }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainers');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerById(trainerId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers/${trainerId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer details');
+    }
+
+    return response.json();
+  }
+
+  async getAvailableSlots(trainerId: string, date: string, duration?: number): Promise<unknown> {
+    const queryParams = new URLSearchParams({ date });
+    if (duration) {
+      queryParams.append('duration', duration.toString());
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainers/${trainerId}/slots?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get available slots');
+    }
+
+    return response.json();
+  }
+
+  async createBooking(bookingData: {
+    trainerId: string;
+    sessionType: string;
+    scheduledDate: string;
+    startTime: string;
+    duration: number;
+    notes?: string;
+  }): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(bookingData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create booking');
+    }
+
+    return response.json();
+  }
+
+  async getUserBookings(params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/my-bookings?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get bookings');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerBookings(params?: {
+    status?: string;
+    date?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/bookings?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer bookings');
+    }
+
+    return response.json();
+  }
+
+  async updateBookingStatus(bookingId: string, status: string, reason?: string, trainerNotes?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ status, reason, trainerNotes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update booking status');
+    }
+
+    return response.json();
+  }
+
+  async addBookingFeedback(bookingId: string, rating: number, comment: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/feedback`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ rating, comment }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add feedback');
+    }
+
+    return response.json();
+  }
+
+  async updateTrainerAvailability(availability: unknown[]): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/availability`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ availability }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update availability');
+    }
+
+    return response.json();
+  }
+
+  async addBlockedSlot(slotData: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    reason?: string;
+  }): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/blocked-slots`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(slotData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to add blocked slot');
+    }
+
+    return response.json();
+  }
+
+  async updateTrainerPricing(pricingData: {
+    sessionTypes?: unknown[];
+    hourlyRate?: number;
+  }): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/trainer/pricing`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(pricingData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update pricing');
+    }
+
+    return response.json();
+  }
+
+  async getBookingStats(startDate?: string, endDate?: string): Promise<unknown> {
+    let url = `${API_BASE_URL}/bookings/trainer/stats`;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get booking stats');
+    }
+
+    return response.json();
+  }
+
+  async confirmBookingPayment(bookingId: string, paymentIntentId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/confirm-payment`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ paymentIntentId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to confirm payment');
+    }
+
+    return response.json();
+  }
+
+  async cancelBookingWithRefund(bookingId: string, reason?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel-with-refund`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cancel booking');
+    }
+
+    return response.json();
+  }
+
+  // Session Slot API methods
+  async createSessionSlot(slotData: unknown): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(slotData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create session slot');
+    }
+
+    return response.json();
+  }
+
+  async getAllSessionSlots(params?: {
+    trainerId?: string;
+    sessionType?: string;
+    mode?: string;
+    status?: string;
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/session-slots?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get session slots');
+    }
+
+    return response.json();
+  }
+
+  async getTrainerSessionSlots(params?: {
+    status?: string;
+    date?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+
+    const response = await fetch(`${API_BASE_URL}/session-slots/trainer/my-slots?${queryParams}`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get trainer session slots');
+    }
+
+    return response.json();
+  }
+
+  async getSessionSlotById(slotId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get session slot');
+    }
+
+    return response.json();
+  }
+
+  async updateSessionSlot(slotId: string, updates: unknown): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update session slot');
+    }
+
+    return response.json();
+  }
+
+  async cancelSessionSlot(slotId: string, reason?: string, notifyParticipants = true): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/cancel`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason, notifyParticipants }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to cancel session slot');
+    }
+
+    return response.json();
+  }
+
+  async deleteSessionSlot(slotId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete session slot');
+    }
+
+    return response.json();
+  }
+
+  async bookSessionSlot(slotId: string, notes?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to book session slot');
+    }
+
+    return response.json();
+  }
+
+  async getSlotStatistics(startDate?: string, endDate?: string): Promise<unknown> {
+    let url = `${API_BASE_URL}/session-slots/trainer/statistics`;
+    if (startDate && endDate) {
+      url += `?startDate=${startDate}&endDate=${endDate}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get slot statistics');
+    }
+
+    return response.json();
+  }
+
+  async duplicateSessionSlot(slotId: string, date: string, startTime?: string, endTime?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/duplicate`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ date, startTime, endTime }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to duplicate session slot');
+    }
+
+    return response.json();
+  }
+
+  async getMeetingInfo(slotId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/meeting-info`, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get meeting info');
+    }
+
+    return response.json();
+  }
+
+  async regenerateVideoCallRoom(slotId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/regenerate-room`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to regenerate video call room');
+    }
+
+    return response.json();
+  }
+
+  // Get available session slots for a trainer on a specific date (for booking)
+  async getAvailableSessionSlots(trainerId: string, date?: string, sessionType?: string): Promise<unknown> {
+    let url = `${API_BASE_URL}/session-slots?trainerId=${trainerId}&status=available`;
+    
+    if (date) {
+      url += `&date=${date}`;
+    }
+    
+    if (sessionType) {
+      url += `&sessionType=${sessionType}`;
+    }
+
+    const response = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get session slots');
+    }
+
+    return response.json();
+  }
+
+  // Book a session slot directly
+  // async bookSessionSlot(slotId: string, notes?: string): Promise<unknown> {
+  //   const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
+  //     method: 'POST',
+  //     headers: this.getHeaders(),
+  //     body: JSON.stringify({ notes }),
+  //   });
+
+  //   if (!response.ok) {
+  //     const error = await response.json();
+  //     throw new Error(error.message || 'Failed to book session slot');
+  //   }
+
+  //   return response.json();
+  // }
+
+  async updateProfile(data: {
+    name?: string;
+    bio?: string;
+    age?: number | string;
+    height?: number | string;
+    weight?: number | string;
+    fitnessLevel?: string;
+    goals?: string[];
+    avatar?: string;
+  }): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/profile`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update profile');
+    }
+    return response.json();
+  }
+
+  async updateTrainerProfile(data: {
+    name?: string;
+    bio?: string;
+    specializations?: string[];
+    certifications?: string[];
+    experience?: number | string;
+    hourlyRate?: number | string;
+    avatar?: string;
+  }): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/dashboard/trainer-profile`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update profile');
+    }
+    return response.json();
+  }
+
+  // Admin API methods
+  async getAdminStats(): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to get admin stats');
+    return response.json();
+  }
+
+  async getAdminUsers(params?: { page?: number; limit?: number; search?: string; userType?: string }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
+    const response = await fetch(`${API_BASE_URL}/admin/users?${queryParams}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get users');
+    return response.json();
+  }
+
+  async getAdminTrainers(): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get trainers');
+    return response.json();
+  }
+
+  async getPendingTrainers(): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/pending`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get pending trainers');
+    return response.json();
+  }
+
+  async verifyTrainer(trainerId: string, notes?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/verify`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async rejectTrainer(trainerId: string, notes?: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/reject`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async getAdminPayments(params?: { page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; search?: string; sortBy?: string; sortOrder?: string }): Promise<unknown> {
+    const queryParams = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
+    const response = await fetch(`${API_BASE_URL}/admin/payments?${queryParams}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get payments');
+    return response.json();
+  }
+
+  async getAdminPaymentById(paymentId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/payments/${paymentId}`, { headers: this.getHeaders() });
+    if (!response.ok) throw new Error('Failed to get payment');
+    return response.json();
+  }
+
+  async toggleUserActive(userId: string): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/toggle-active`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+
+  async adminAddTrainer(data: unknown): Promise<unknown> {
+    const response = await fetch(`${API_BASE_URL}/admin/trainers`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) { const e = await response.json(); throw new Error(e.message); }
+    return response.json();
+  }
+}
+
+export const apiService = new ApiService();

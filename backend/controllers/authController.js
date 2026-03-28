@@ -1,4 +1,5 @@
 import User from "../models/users.js";
+import TrainerDocument from "../models/trainerDocument.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -56,6 +57,7 @@ export const registerUser = async (req, res) => {
     if (userType === "trainer") {
       userData.profile = {
         bio: bio || "",
+        fitnessLevel: "beginner",
       };
       userData.trainerProfile = {
         specializations: specializations || [],
@@ -63,10 +65,33 @@ export const registerUser = async (req, res) => {
         experience: experience ? parseInt(experience) : 0,
         hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
       };
+      userData.trainerVerification = {
+        status: "pending",
+        submittedAt: new Date(),
+        documents: [],
+      };
+      userData.isVerified = false;
+      userData.isActive = false;
     }
 
     // Create user
     const user = await User.create(userData);
+
+    // Save documents to separate collection — avoids any schema cast issues on User model
+    if (userType === "trainer" && Array.isArray(req.body.documents) && req.body.documents.length > 0) {
+      const docInserts = req.body.documents
+        .filter(d => d && d.data)
+        .map(d => ({
+          trainerId: user._id,
+          name: String(d.name || "document"),
+          mimeType: String(d.type || "application/octet-stream"),
+          size: Number(d.size || 0),
+          data: String(d.data),
+        }));
+      if (docInserts.length > 0) {
+        await TrainerDocument.insertMany(docInserts);
+      }
+    }
 
     // Generate token
     const token = jwt.sign(
@@ -83,11 +108,15 @@ export const registerUser = async (req, res) => {
         name: user.name,
         email: user.email,
         userType: user.userType,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        trainerVerification: user.trainerVerification,
         profile: user.profile,
         trainerProfile: user.trainerProfile,
       },
     });
   } catch (error) {
+    console.error("Register error:", error.message, error.errors);
     res.status(500).json({ message: error.message });
   }
 };
@@ -123,6 +152,9 @@ export const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         userType: user.userType,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        trainerVerification: user.trainerVerification,
       },
     });
   } catch (error) {
@@ -139,6 +171,28 @@ export const getTrainers = async (req, res) => {
     }).select('-password');
 
     res.json(trainers);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET /api/auth/me — returns fresh user data
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      userType: user.userType,
+      isVerified: user.isVerified,
+      isActive: user.isActive,
+      trainerVerification: user.trainerVerification,
+      profile: user.profile,
+      trainerProfile: user.trainerProfile,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

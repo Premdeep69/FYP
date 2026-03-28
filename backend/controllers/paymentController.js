@@ -17,6 +17,14 @@ export const createSessionPayment = async (req, res) => {
     const userId = req.user._id;
     const { sessionId, amount, trainerId } = req.body;
 
+    // Validate Stripe configuration
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('your_stripe')) {
+      return res.status(503).json({ 
+        message: 'Stripe is not configured. Please add your Stripe API keys to the .env file.',
+        configRequired: true 
+      });
+    }
+
     // Validate session exists
     const session = await Session.findById(sessionId).populate('trainerId', 'name');
     if (!session) {
@@ -84,6 +92,15 @@ export const createSessionPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('Create session payment error:', error);
+    
+    // Provide more helpful error messages
+    if (error.type === 'StripeAuthenticationError') {
+      return res.status(503).json({ 
+        message: 'Stripe authentication failed. Please check your Stripe API keys.',
+        configRequired: true 
+      });
+    }
+    
     res.status(500).json({ message: error.message });
   }
 };
@@ -93,6 +110,22 @@ export const createSubscription = async (req, res) => {
   try {
     const userId = req.user._id;
     const { priceId, planName } = req.body;
+
+    // Validate Stripe configuration
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('your_stripe')) {
+      return res.status(503).json({ 
+        message: 'Stripe is not configured. Please add your Stripe API keys to the .env file.',
+        configRequired: true 
+      });
+    }
+
+    // Validate price ID format
+    if (!priceId || !priceId.startsWith('price_')) {
+      return res.status(400).json({ 
+        message: 'Invalid Stripe price ID. Please configure valid Stripe price IDs in the frontend.',
+        invalidPriceId: true 
+      });
+    }
 
     const user = await User.findById(userId);
 
@@ -155,6 +188,22 @@ export const createSubscription = async (req, res) => {
     });
   } catch (error) {
     console.error('Create subscription error:', error);
+    
+    // Provide more helpful error messages
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ 
+        message: 'Invalid Stripe request. Please check your Stripe configuration and price IDs.',
+        stripeError: error.message 
+      });
+    }
+    
+    if (error.type === 'StripeAuthenticationError') {
+      return res.status(503).json({ 
+        message: 'Stripe authentication failed. Please check your Stripe API keys.',
+        configRequired: true 
+      });
+    }
+    
     res.status(500).json({ message: error.message });
   }
 };
@@ -364,11 +413,14 @@ const handlePaymentIntentSucceeded = async (paymentIntent) => {
     }
   );
 
-  // If it's a session payment, update session status
-  if (paymentIntent.metadata.type === 'session') {
+  // If it's a session payment, update session status to confirmed
+  if (paymentIntent.metadata.type === 'session' && paymentIntent.metadata.sessionId) {
     await Session.findByIdAndUpdate(
       paymentIntent.metadata.sessionId,
-      { status: 'confirmed' }
+      { 
+        status: 'confirmed',
+        paymentStatus: 'paid'
+      }
     );
   }
 };
@@ -381,6 +433,14 @@ const handlePaymentIntentFailed = async (paymentIntent) => {
       stripeWebhookData: paymentIntent,
     }
   );
+
+  // If it's a session payment, update session payment status to failed
+  if (paymentIntent.metadata.type === 'session' && paymentIntent.metadata.sessionId) {
+    await Session.findByIdAndUpdate(
+      paymentIntent.metadata.sessionId,
+      { paymentStatus: 'failed' }
+    );
+  }
 };
 
 const handleInvoicePaymentSucceeded = async (invoice) => {

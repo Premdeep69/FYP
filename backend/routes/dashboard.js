@@ -7,7 +7,9 @@ import {
   getWorkoutAnalytics,
   getWorkoutHistory,
   updateWorkout,
-  deleteWorkout
+  deleteWorkout,
+  updateProfile,
+  updateTrainerProfile
 } from "../controllers/dashboardController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -33,5 +35,9 @@ router.get("/analytics", getWorkoutAnalytics);
 
 // Goals management - both users and trainers
 router.put("/goals", updateGoals);
+
+// Profile update
+router.put("/profile", updateProfile);
+router.put("/trainer-profile", updateTrainerProfile);
 
 export default router;

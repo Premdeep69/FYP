@@ -11,9 +11,15 @@ const Dashboard = () => {
       if (!user) {
         // If not logged in, redirect to login
         navigate("/login");
+      } else if (user.userType === "admin") {
+        navigate("/admin");
       } else if (user.userType === "trainer") {
-        // If trainer, redirect to trainer dashboard
-        navigate("/trainer-dashboard");
+        // Unverified trainers go to pending page
+        if (!user.isVerified) {
+          navigate("/pending-approval");
+        } else {
+          navigate("/trainer-dashboard");
+        }
       } else {
         // If user, redirect to user dashboard
         navigate("/user-dashboard");

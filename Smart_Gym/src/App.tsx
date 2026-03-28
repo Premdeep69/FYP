@@ -12,6 +12,10 @@ import WorkoutPlans from "./pages/WorkoutPlans";
 import MyWorkouts from "./pages/MyWorkouts";
 import WorkoutSession from "./pages/WorkoutSession";
 import Trainers from "./pages/Trainers";
+import BookTrainer from "./pages/BookTrainerNew";
+import MyBookings from "./pages/MyBookings";
+import TrainerManagement from "./pages/TrainerManagement";
+import SessionSlots from "./pages/SessionSlots";
 import Chat from "./pages/Chat";
 import VideoCall from "./pages/VideoCall";
 import Dashboard from "./pages/Dashboard";
@@ -19,8 +23,10 @@ import UserDashboard from "./pages/UserDashboard";
 import TrainerDashboard from "./pages/TrainerDashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Subscription from "./pages/Subscription";
+import BookingPayment from "./pages/BookingPayment";
 import NotificationTest from "./pages/NotificationTest";
+import AdminDashboard from "./pages/AdminDashboard";
+import PendingApproval from "./pages/PendingApproval";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,13 +46,19 @@ const App = () => (
               <Route path="/my-workouts" element={<Layout children={<MyWorkouts />} />} />
               <Route path="/workout-session" element={<Layout children={<WorkoutSession />} />} />
               <Route path="/trainers" element={<Layout children={<Trainers />} />} />
+              <Route path="/book-trainer/:trainerId" element={<Layout children={<BookTrainer />} />} />
+              <Route path="/my-bookings" element={<Layout children={<MyBookings />} />} />
+              <Route path="/booking-payment" element={<Layout children={<BookingPayment />} />} />
+              <Route path="/trainer-management" element={<Layout children={<TrainerManagement />} />} />
+              <Route path="/session-slots" element={<Layout children={<SessionSlots />} />} />
               <Route path="/chat" element={<Layout children={<Chat />} />} />
               <Route path="/video-call" element={<Layout children={<VideoCall />} />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/user-dashboard" element={<Layout children={<UserDashboard />} />} />
               <Route path="/trainer-dashboard" element={<Layout children={<TrainerDashboard />} />} />
-              <Route path="/subscription" element={<Layout children={<Subscription />} />} />
               <Route path="/notification-test" element={<Layout children={<NotificationTest />} />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/pending-approval" element={<PendingApproval />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="*" element={<NotFound />} />
