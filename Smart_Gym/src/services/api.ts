@@ -66,8 +66,8 @@ export interface UserDashboardData {
   user: {
     name: string;
     email: string;
-    profile: any;
-    stats: any;
+    profile: unknown;
+    stats: unknown;
   };
   weeklyStats: {
     workoutSessions: number;
@@ -122,7 +122,7 @@ export interface TrainerDashboardData {
   trainer: {
     name: string;
     email: string;
-    trainerProfile: any;
+    trainerProfile: unknown;
   };
   stats: {
     activeClients: number;
@@ -131,8 +131,8 @@ export interface TrainerDashboardData {
     todaySessions: number;
     rating: number;
   };
-  todaySessions: any[];
-  activeClients: any[];
+  todaySessions: unknown[];
+  activeClients: unknown[];
 }
 
 class ApiService {
@@ -215,7 +215,7 @@ class ApiService {
     type: string;
     duration: number;
     caloriesBurned: number;
-    exercises?: any[];
+    exercises?: unknown[];
     notes?: string;
   }): Promise<{ message: string; workout: Workout }> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout`, {
@@ -253,7 +253,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutAnalytics(period: number = 30): Promise<any> {
+  async getWorkoutAnalytics(period: number = 30): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/analytics?period=${period}`, {
       headers: this.getHeaders(),
     });
@@ -271,7 +271,7 @@ class ApiService {
     type?: string;
     startDate?: string;
     endDate?: string;
-  } = {}): Promise<any> {
+  } = {}): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
@@ -290,7 +290,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateWorkout(workoutId: string, updates: any): Promise<any> {
+  async updateWorkout(workoutId: string, updates: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -305,7 +305,7 @@ class ApiService {
     return response.json();
   }
 
-  async deleteWorkout(workoutId: string): Promise<any> {
+  async deleteWorkout(workoutId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/workout/${workoutId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -320,7 +320,7 @@ class ApiService {
   }
 
   // Chat API methods
-  async getConversations(): Promise<any[]> {
+  async getConversations(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
       headers: this.getHeaders(),
     });
@@ -332,7 +332,7 @@ class ApiService {
     return response.json();
   }
 
-  async getMessages(conversationId: string, page: number = 1, limit: number = 50): Promise<any[]> {
+  async getMessages(conversationId: string, page: number = 1, limit: number = 50): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages?page=${page}&limit=${limit}`, {
       headers: this.getHeaders(),
     });
@@ -344,7 +344,7 @@ class ApiService {
     return response.json();
   }
 
-  async startConversation(receiverId: string): Promise<any> {
+  async startConversation(receiverId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -359,7 +359,7 @@ class ApiService {
     return response.json();
   }
 
-  async getAvailableUsers(): Promise<any[]> {
+  async getAvailableUsers(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/users`, {
       headers: this.getHeaders(),
     });
@@ -371,7 +371,7 @@ class ApiService {
     return response.json();
   }
 
-  async getOnlineUsers(): Promise<any[]> {
+  async getOnlineUsers(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/chat/online-users`, {
       headers: this.getHeaders(),
     });
@@ -384,7 +384,7 @@ class ApiService {
   }
 
   // Payment API methods
-  async createSessionPayment(sessionId: string, amount: number, trainerId: string): Promise<any> {
+  async createSessionPayment(sessionId: string, amount: number, trainerId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/session`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -399,7 +399,7 @@ class ApiService {
     return response.json();
   }
 
-  async createSubscription(priceId: string, planName: string): Promise<any> {
+  async createSubscription(priceId: string, planName: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/subscription`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -414,7 +414,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPaymentHistory(page: number = 1, limit: number = 10): Promise<any> {
+  async getPaymentHistory(page: number = 1, limit: number = 10): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/history?page=${page}&limit=${limit}`, {
       headers: this.getHeaders(),
     });
@@ -426,7 +426,7 @@ class ApiService {
     return response.json();
   }
 
-  async getUserSubscriptions(): Promise<any[]> {
+  async getUserSubscriptions(): Promise<unknown[]> {
     const response = await fetch(`${API_BASE_URL}/payment/subscriptions`, {
       headers: this.getHeaders(),
     });
@@ -438,7 +438,7 @@ class ApiService {
     return response.json();
   }
 
-  async cancelSubscription(subscriptionId: string): Promise<any> {
+  async cancelSubscription(subscriptionId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/subscriptions/${subscriptionId}/cancel`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -452,7 +452,7 @@ class ApiService {
     return response.json();
   }
 
-  async getTrainerEarnings(startDate?: string, endDate?: string): Promise<any> {
+  async getTrainerEarnings(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/payment/earnings`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -480,7 +480,7 @@ class ApiService {
     search?: string;
     sortBy?: string;
     sortOrder?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -505,7 +505,7 @@ class ApiService {
     return response.json();
   }
 
-  async getExerciseById(id: string): Promise<any> {
+  async getExerciseById(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       headers: this.getHeaders(),
     });
@@ -517,7 +517,7 @@ class ApiService {
     return response.json();
   }
 
-  async createExercise(exerciseData: any): Promise<any> {
+  async createExercise(exerciseData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -532,7 +532,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateExercise(id: string, exerciseData: any): Promise<any> {
+  async updateExercise(id: string, exerciseData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -547,7 +547,7 @@ class ApiService {
     return response.json();
   }
 
-  async deleteExercise(id: string): Promise<any> {
+  async deleteExercise(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -561,7 +561,7 @@ class ApiService {
     return response.json();
   }
 
-  async getExerciseFilters(): Promise<any> {
+  async getExerciseFilters(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/filters`);
 
     if (!response.ok) {
@@ -571,7 +571,7 @@ class ApiService {
     return response.json();
   }
 
-  async rateExercise(id: string, rating: number): Promise<any> {
+  async rateExercise(id: string, rating: number): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/exercises/${id}/rate`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -586,7 +586,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPopularExercises(limit?: number): Promise<any> {
+  async getPopularExercises(limit?: number): Promise<unknown> {
     const url = limit ? `${API_BASE_URL}/exercises/popular?limit=${limit}` : `${API_BASE_URL}/exercises/popular`;
     const response = await fetch(url);
 
@@ -609,7 +609,7 @@ class ApiService {
     sortBy?: string;
     sortOrder?: string;
     isPremium?: boolean;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -634,7 +634,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutPlanById(id: string): Promise<any> {
+  async getWorkoutPlanById(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/${id}`, {
       headers: this.getHeaders(),
     });
@@ -646,7 +646,7 @@ class ApiService {
     return response.json();
   }
 
-  async createWorkoutPlan(workoutData: any): Promise<any> {
+  async createWorkoutPlan(workoutData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -661,7 +661,7 @@ class ApiService {
     return response.json();
   }
 
-  async enrollInWorkoutPlan(id: string): Promise<any> {
+  async enrollInWorkoutPlan(id: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/${id}/enroll`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -675,7 +675,7 @@ class ApiService {
     return response.json();
   }
 
-  async getUserWorkoutPlans(status?: string): Promise<any> {
+  async getUserWorkoutPlans(status?: string): Promise<unknown> {
     const url = status ? `${API_BASE_URL}/workouts/user/plans?status=${status}` : `${API_BASE_URL}/workouts/user/plans`;
     const response = await fetch(url, {
       headers: this.getHeaders(),
@@ -688,7 +688,7 @@ class ApiService {
     return response.json();
   }
 
-  async logWorkoutCompletion(progressId: string, workoutData: any): Promise<any> {
+  async logWorkoutCompletion(progressId: string, workoutData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/progress/${progressId}/complete`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -703,7 +703,7 @@ class ApiService {
     return response.json();
   }
 
-  async getWorkoutPlanFilters(): Promise<any> {
+  async getWorkoutPlanFilters(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/workouts/filters`);
 
     if (!response.ok) {
@@ -713,7 +713,7 @@ class ApiService {
     return response.json();
   }
 
-  async getPopularWorkoutPlans(limit?: number): Promise<any> {
+  async getPopularWorkoutPlans(limit?: number): Promise<unknown> {
     const url = limit ? `${API_BASE_URL}/workouts/popular?limit=${limit}` : `${API_BASE_URL}/workouts/popular`;
     const response = await fetch(url);
 
@@ -725,7 +725,7 @@ class ApiService {
   }
 
   // Payment Methods
-  async getPaymentMethods(): Promise<any> {
+  async getPaymentMethods(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods`, {
       headers: this.getHeaders(),
     });
@@ -737,7 +737,7 @@ class ApiService {
     return response.json();
   }
 
-  async addPaymentMethod(paymentMethodId: string): Promise<any> {
+  async addPaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -752,7 +752,7 @@ class ApiService {
     return response.json();
   }
 
-  async removePaymentMethod(paymentMethodId: string): Promise<any> {
+  async removePaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods/${paymentMethodId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -766,7 +766,7 @@ class ApiService {
     return response.json();
   }
 
-  async setDefaultPaymentMethod(paymentMethodId: string): Promise<any> {
+  async setDefaultPaymentMethod(paymentMethodId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/methods/default`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -782,7 +782,7 @@ class ApiService {
   }
 
   // Invoice Generation
-  async generateInvoice(paymentId: string): Promise<any> {
+  async generateInvoice(paymentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/invoice/${paymentId}`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -809,7 +809,7 @@ class ApiService {
   }
 
   // Payment Statistics
-  async getPaymentStatistics(startDate?: string, endDate?: string): Promise<any> {
+  async getPaymentStatistics(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/payment/statistics`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -827,7 +827,7 @@ class ApiService {
   }
 
   // Payment Verification
-  async verifyPaymentStatus(paymentIntentId: string): Promise<any> {
+  async verifyPaymentStatus(paymentIntentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/payment/verify/${paymentIntentId}`, {
       headers: this.getHeaders(),
     });
@@ -845,7 +845,7 @@ class ApiService {
     minRating?: number;
     maxPrice?: number;
     search?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -864,7 +864,7 @@ class ApiService {
     return response.json();
   }
 
-  async getTrainerById(trainerId: string): Promise<any> {
+  async getTrainerById(trainerId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/trainers/${trainerId}`);
 
     if (!response.ok) {
@@ -874,7 +874,7 @@ class ApiService {
     return response.json();
   }
 
-  async getAvailableSlots(trainerId: string, date: string, duration?: number): Promise<any> {
+  async getAvailableSlots(trainerId: string, date: string, duration?: number): Promise<unknown> {
     const queryParams = new URLSearchParams({ date });
     if (duration) {
       queryParams.append('duration', duration.toString());
@@ -896,7 +896,7 @@ class ApiService {
     startTime: string;
     duration: number;
     notes?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -915,7 +915,7 @@ class ApiService {
     status?: string;
     page?: number;
     limit?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -941,7 +941,7 @@ class ApiService {
     date?: string;
     page?: number;
     limit?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -962,7 +962,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateBookingStatus(bookingId: string, status: string, reason?: string, trainerNotes?: string): Promise<any> {
+  async updateBookingStatus(bookingId: string, status: string, reason?: string, trainerNotes?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/status`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -977,7 +977,7 @@ class ApiService {
     return response.json();
   }
 
-  async addBookingFeedback(bookingId: string, rating: number, comment: string): Promise<any> {
+  async addBookingFeedback(bookingId: string, rating: number, comment: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/feedback`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -992,7 +992,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateTrainerAvailability(availability: any[]): Promise<any> {
+  async updateTrainerAvailability(availability: unknown[]): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/trainer/availability`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1012,7 +1012,7 @@ class ApiService {
     startTime: string;
     endTime: string;
     reason?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/trainer/blocked-slots`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1028,9 +1028,9 @@ class ApiService {
   }
 
   async updateTrainerPricing(pricingData: {
-    sessionTypes?: any[];
+    sessionTypes?: unknown[];
     hourlyRate?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/trainer/pricing`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1045,7 +1045,7 @@ class ApiService {
     return response.json();
   }
 
-  async getBookingStats(startDate?: string, endDate?: string): Promise<any> {
+  async getBookingStats(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/bookings/trainer/stats`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -1062,7 +1062,7 @@ class ApiService {
     return response.json();
   }
 
-  async confirmBookingPayment(bookingId: string, paymentIntentId: string): Promise<any> {
+  async confirmBookingPayment(bookingId: string, paymentIntentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/confirm-payment`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1077,7 +1077,7 @@ class ApiService {
     return response.json();
   }
 
-  async cancelBookingWithRefund(bookingId: string, reason?: string): Promise<any> {
+  async cancelBookingWithRefund(bookingId: string, reason?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/cancel-with-refund`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1093,7 +1093,7 @@ class ApiService {
   }
 
   // Session Slot API methods
-  async createSessionSlot(slotData: any): Promise<any> {
+  async createSessionSlot(slotData: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1118,7 +1118,7 @@ class ApiService {
     endDate?: string;
     page?: number;
     limit?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -1142,7 +1142,7 @@ class ApiService {
     date?: string;
     page?: number;
     limit?: number;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -1163,7 +1163,7 @@ class ApiService {
     return response.json();
   }
 
-  async getSessionSlotById(slotId: string): Promise<any> {
+  async getSessionSlotById(slotId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`);
 
     if (!response.ok) {
@@ -1173,7 +1173,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateSessionSlot(slotId: string, updates: any): Promise<any> {
+  async updateSessionSlot(slotId: string, updates: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1188,7 +1188,7 @@ class ApiService {
     return response.json();
   }
 
-  async cancelSessionSlot(slotId: string, reason?: string, notifyParticipants = true): Promise<any> {
+  async cancelSessionSlot(slotId: string, reason?: string, notifyParticipants = true): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/cancel`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1203,7 +1203,7 @@ class ApiService {
     return response.json();
   }
 
-  async deleteSessionSlot(slotId: string): Promise<any> {
+  async deleteSessionSlot(slotId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
@@ -1217,7 +1217,7 @@ class ApiService {
     return response.json();
   }
 
-  async bookSessionSlot(slotId: string, notes?: string): Promise<any> {
+  async bookSessionSlot(slotId: string, notes?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1232,7 +1232,7 @@ class ApiService {
     return response.json();
   }
 
-  async getSlotStatistics(startDate?: string, endDate?: string): Promise<any> {
+  async getSlotStatistics(startDate?: string, endDate?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/session-slots/trainer/statistics`;
     if (startDate && endDate) {
       url += `?startDate=${startDate}&endDate=${endDate}`;
@@ -1249,7 +1249,7 @@ class ApiService {
     return response.json();
   }
 
-  async duplicateSessionSlot(slotId: string, date: string, startTime?: string, endTime?: string): Promise<any> {
+  async duplicateSessionSlot(slotId: string, date: string, startTime?: string, endTime?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/duplicate`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1264,7 +1264,7 @@ class ApiService {
     return response.json();
   }
 
-  async getMeetingInfo(slotId: string): Promise<any> {
+  async getMeetingInfo(slotId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/meeting-info`, {
       headers: this.getHeaders(),
     });
@@ -1277,7 +1277,7 @@ class ApiService {
     return response.json();
   }
 
-  async regenerateVideoCallRoom(slotId: string): Promise<any> {
+  async regenerateVideoCallRoom(slotId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/regenerate-room`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -1292,7 +1292,7 @@ class ApiService {
   }
 
   // Get available session slots for a trainer on a specific date (for booking)
-  async getAvailableSessionSlots(trainerId: string, date?: string, sessionType?: string): Promise<any> {
+  async getAvailableSessionSlots(trainerId: string, date?: string, sessionType?: string): Promise<unknown> {
     let url = `${API_BASE_URL}/session-slots?trainerId=${trainerId}&status=available`;
     
     if (date) {
@@ -1316,20 +1316,20 @@ class ApiService {
   }
 
   // Book a session slot directly
-  async bookSessionSlot(slotId: string, notes?: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ notes }),
-    });
+  // async bookSessionSlot(slotId: string, notes?: string): Promise<unknown> {
+  //   const response = await fetch(`${API_BASE_URL}/session-slots/${slotId}/book`, {
+  //     method: 'POST',
+  //     headers: this.getHeaders(),
+  //     body: JSON.stringify({ notes }),
+  //   });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to book session slot');
-    }
+  //   if (!response.ok) {
+  //     const error = await response.json();
+  //     throw new Error(error.message || 'Failed to book session slot');
+  //   }
 
-    return response.json();
-  }
+  //   return response.json();
+  // }
 
   async updateProfile(data: {
     name?: string;
@@ -1340,7 +1340,7 @@ class ApiService {
     fitnessLevel?: string;
     goals?: string[];
     avatar?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/profile`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1361,7 +1361,7 @@ class ApiService {
     experience?: number | string;
     hourlyRate?: number | string;
     avatar?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/dashboard/trainer-profile`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1375,7 +1375,7 @@ class ApiService {
   }
 
   // Admin API methods
-  async getAdminStats(): Promise<any> {
+  async getAdminStats(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/stats`, {
       headers: this.getHeaders(),
     });
@@ -1383,7 +1383,7 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminUsers(params?: { page?: number; limit?: number; search?: string; userType?: string }): Promise<any> {
+  async getAdminUsers(params?: { page?: number; limit?: number; search?: string; userType?: string }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
     const response = await fetch(`${API_BASE_URL}/admin/users?${queryParams}`, { headers: this.getHeaders() });
@@ -1391,19 +1391,19 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminTrainers(): Promise<any> {
+  async getAdminTrainers(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/trainers`, { headers: this.getHeaders() });
     if (!response.ok) throw new Error('Failed to get trainers');
     return response.json();
   }
 
-  async getPendingTrainers(): Promise<any> {
+  async getPendingTrainers(): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/trainers/pending`, { headers: this.getHeaders() });
     if (!response.ok) throw new Error('Failed to get pending trainers');
     return response.json();
   }
 
-  async verifyTrainer(trainerId: string, notes?: string): Promise<any> {
+  async verifyTrainer(trainerId: string, notes?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/verify`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1413,7 +1413,7 @@ class ApiService {
     return response.json();
   }
 
-  async rejectTrainer(trainerId: string, notes?: string): Promise<any> {
+  async rejectTrainer(trainerId: string, notes?: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/trainers/${trainerId}/reject`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1423,7 +1423,7 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminPayments(params?: { page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; search?: string; sortBy?: string; sortOrder?: string }): Promise<any> {
+  async getAdminPayments(params?: { page?: number; limit?: number; status?: string; startDate?: string; endDate?: string; search?: string; sortBy?: string; sortOrder?: string }): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && queryParams.append(k, String(v)));
     const response = await fetch(`${API_BASE_URL}/admin/payments?${queryParams}`, { headers: this.getHeaders() });
@@ -1431,13 +1431,13 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminPaymentById(paymentId: string): Promise<any> {
+  async getAdminPaymentById(paymentId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/payments/${paymentId}`, { headers: this.getHeaders() });
     if (!response.ok) throw new Error('Failed to get payment');
     return response.json();
   }
 
-  async toggleUserActive(userId: string): Promise<any> {
+  async toggleUserActive(userId: string): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/toggle-active`, {
       method: 'PUT',
       headers: this.getHeaders(),
@@ -1446,7 +1446,7 @@ class ApiService {
     return response.json();
   }
 
-  async adminAddTrainer(data: any): Promise<any> {
+  async adminAddTrainer(data: unknown): Promise<unknown> {
     const response = await fetch(`${API_BASE_URL}/admin/trainers`, {
       method: 'POST',
       headers: this.getHeaders(),
