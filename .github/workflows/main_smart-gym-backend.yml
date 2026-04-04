@@ -115,7 +115,7 @@ jobs:
         with:
           name: node-app
 
-     - name: Login to Azure
+       - name: Login to Azure
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_6095C387EC6B49CAB98BAF8CDB3F673C }}
