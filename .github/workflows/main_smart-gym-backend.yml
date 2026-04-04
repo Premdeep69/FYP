@@ -63,7 +63,6 @@
 #           slot-name: 'Production'
 #           package: .
           
-
 name: Build and deploy Node.js app to Azure Web App - smart-gym-backend
 
 on:
@@ -76,6 +75,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: backend   # ✅ KEY FIX
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,25 +88,22 @@ jobs:
         with:
           node-version: '22.x'
           cache: 'npm'
+          cache-dependency-path: backend/package-lock.json  # ✅ IMPORTANT
 
-      # ✅ Clean install (NO stale deps)
       - name: Install dependencies
         run: npm ci
 
-      # ✅ No real build needed (backend)
       - name: Build (optional)
         run: npm run build --if-present
 
-      # ❌ DO NOT include node_modules
-      - name: Prepare artifact
-        run: |
-          rm -rf node_modules
-          
-      - name: Upload artifact
+      - name: Remove node_modules (avoid stale deps)
+        run: rm -rf node_modules
+
+      - name: Upload backend artifact only
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: backend   # ✅ ONLY backend folder
 
   deploy:
     runs-on: ubuntu-latest
@@ -122,7 +122,6 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2D463B28CFF84B72B3534470872495CC }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4C1F2E418F41467B897F32D0DEF14D6F }}
 
-      # ✅ Let Azure install dependencies itself
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
