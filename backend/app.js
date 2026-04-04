@@ -1,7 +1,9 @@
-import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import cors from "cors";
 import connectDB from "./config/db.js";
+
+// Routes
 import adminRoutes from "./routes/admin.js";
 import authRoutes from "./routes/auth.js";
 import bookingRoutes from "./routes/booking.js";
@@ -21,8 +23,7 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-
-
+// Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL,
   credentials: true,
@@ -30,31 +31,36 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// IMPORTANT: explicitly handle preflight
+// Handle preflight requests
 app.options("*", cors({
   origin: process.env.FRONTEND_URL,
   credentials: true
 }));
 
-// Raw body parser for Stripe webhooks (must be before express.json())
+// Raw body parser for Stripe webhooks
 app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json({ limit: '20mb' }));
+// JSON parser
+app.use(express.json({ limit: "20mb" }));
 
 // Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/payment", paymentRoutes);
-app.use("/api/exercises", exerciseRoutes);
-app.use("/api/workouts", workoutRoutes);
-app.use("/api/seed", seedRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/session-slots", sessionSlotRoutes);
-app.use("/api/admin", adminRoutes);
+const routes = [
+  { path: "/api/auth", handler: authRoutes },
+  { path: "/api/dashboard", handler: dashboardRoutes },
+  { path: "/api/chat", handler: chatRoutes },
+  { path: "/api/payment", handler: paymentRoutes },
+  { path: "/api/exercises", handler: exerciseRoutes },
+  { path: "/api/workouts", handler: workoutRoutes },
+  { path: "/api/seed", handler: seedRoutes },
+  { path: "/api/notifications", handler: notificationRoutes },
+  { path: "/api/bookings", handler: bookingRoutes },
+  { path: "/api/session-slots", handler: sessionSlotRoutes },
+  { path: "/api/admin", handler: adminRoutes },
+];
 
-// Health check route
+routes.forEach(route => app.use(route.path, route.handler));
+
+// Health check
 app.get("/", (req, res) => {
   res.json({ message: "Smart Gym Fitness API is running!" });
 });
