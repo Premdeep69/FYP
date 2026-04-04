@@ -25,6 +25,7 @@ connectDB();
 app.use(cors({
   origin: true, // Allow all origins in development
   credentials: true
+  
 }));
 
 // Raw body parser for Stripe webhooks (must be before express.json())
