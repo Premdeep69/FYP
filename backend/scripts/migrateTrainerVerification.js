@@ -2,7 +2,10 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import User from "../models/users.js";
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
+
 
 const migrate = async () => {
   await mongoose.connect(process.env.MONGO_URI);

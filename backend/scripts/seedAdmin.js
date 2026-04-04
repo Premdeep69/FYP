@@ -1,9 +1,11 @@
-import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
+import mongoose from "mongoose";
 import User from "../models/users.js";
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
+
 
 const seedAdmin = async () => {
   await mongoose.connect(process.env.MONGO_URI);

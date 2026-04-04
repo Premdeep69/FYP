@@ -1,7 +1,9 @@
 import admin from 'firebase-admin';
-import dotenv from 'dotenv';
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
+
 
 // Initialize Firebase Admin SDK
 // You'll need to download your service account key from Firebase Console

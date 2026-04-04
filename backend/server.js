@@ -1,10 +1,12 @@
-import dotenv from "dotenv";
+// server.js
 import { createServer } from "http";
 import { Server } from "socket.io";
 import app from "./app.js";
 import { handleConnection } from "./socket/socketHandler.js";
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
 
 const PORT = process.env.PORT || 5000;
 

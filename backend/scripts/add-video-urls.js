@@ -2,7 +2,10 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Exercise from '../models/exercise.js';
 
-dotenv.config();
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
+
 
 const videoUrls = {
   'Push-ups': 'https://www.youtube.com/watch?v=IODxDxX7oi4',
