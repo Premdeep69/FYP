@@ -1,18 +1,18 @@
-import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import express from "express";
 import connectDB from "./config/db.js";
-import authRoutes from "./routes/auth.js";
-import dashboardRoutes from "./routes/dashboard.js";
-import chatRoutes from "./routes/chat.js";
-import paymentRoutes from "./routes/payment.js";
-import exerciseRoutes from "./routes/exercise.js";
-import workoutRoutes from "./routes/workout.js";
-import seedRoutes from "./routes/seed.js";
-import notificationRoutes from "./routes/notification.js";
-import bookingRoutes from "./routes/booking.js";
-import sessionSlotRoutes from "./routes/sessionSlot.js";
 import adminRoutes from "./routes/admin.js";
+import authRoutes from "./routes/auth.js";
+import bookingRoutes from "./routes/booking.js";
+import chatRoutes from "./routes/chat.js";
+import dashboardRoutes from "./routes/dashboard.js";
+import exerciseRoutes from "./routes/exercise.js";
+import notificationRoutes from "./routes/notification.js";
+import paymentRoutes from "./routes/payment.js";
+import seedRoutes from "./routes/seed.js";
+import sessionSlotRoutes from "./routes/sessionSlot.js";
+import workoutRoutes from "./routes/workout.js";
 
 dotenv.config();
 
@@ -23,9 +23,9 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: true, // Allow all origins in development
+  origin: import.meta.env.VITE_FRONTEND_URL,
   credentials: true
-  
+
 }));
 
 // Raw body parser for Stripe webhooks (must be before express.json())
