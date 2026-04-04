@@ -23,9 +23,8 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: import.meta.env.VITE_FRONTEND_URL,
+  origin: process.env.FRONTEND_URL,
   credentials: true
-
 }));
 
 // Raw body parser for Stripe webhooks (must be before express.json())
