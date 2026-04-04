@@ -21,8 +21,17 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Middleware
+
+
 app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// IMPORTANT: explicitly handle preflight
+app.options("*", cors({
   origin: process.env.FRONTEND_URL,
   credentials: true
 }));
