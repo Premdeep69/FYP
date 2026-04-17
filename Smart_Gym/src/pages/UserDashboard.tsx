@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { apiService, UserDashboardData } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import PaymentHistory from "@/components/PaymentHistory";
 import WorkoutProgress from "@/components/WorkoutProgress";
 import NotificationSettings from "@/components/NotificationSettings";
 import { 
@@ -63,6 +64,16 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("overview");
   const [showLogWorkout, setShowLogWorkout] = useState(false);
+  const [showGoalDialog, setShowGoalDialog] = useState(false);
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [goalForm, setGoalForm] = useState({
+    type: "workout-sessions",
+    title: "",
+    targetValue: "",
+    unit: "sessions",
+    period: "weekly",
+    endDate: "",
+  });
   const [workoutForm, setWorkoutForm] = useState({
     name: "",
     type: "strength",
@@ -194,6 +205,65 @@ const UserDashboard = () => {
         description: error.message || "Failed to log workout",
         variant: "destructive",
       });
+    }
+  };
+
+  // Goal type presets — auto-fill unit when type changes
+  const GOAL_PRESETS: Record<string, { unit: string; title: string }> = {
+    "workout-sessions": { unit: "sessions", title: "Complete workout sessions" },
+    "active-minutes":   { unit: "minutes",  title: "Log active minutes" },
+    "calories-burned":  { unit: "calories", title: "Burn calories" },
+    "weight-loss":      { unit: "kg",       title: "Lose weight" },
+    "weight-gain":      { unit: "kg",       title: "Gain weight" },
+    "custom":           { unit: "",         title: "" },
+  };
+
+  const openGoalDialog = () => {
+    setGoalForm({ type: "workout-sessions", title: "Complete workout sessions", targetValue: "", unit: "sessions", period: "weekly", endDate: "" });
+    setShowGoalDialog(true);
+  };
+
+  const handleGoalTypeChange = (type: string) => {
+    const preset = GOAL_PRESETS[type] || { unit: "", title: "" };
+    setGoalForm(prev => ({ ...prev, type, unit: preset.unit, title: preset.title }));
+  };
+
+  const handleSaveGoal = async () => {
+    if (!goalForm.title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" }); return;
+    }
+    if (!goalForm.targetValue || Number(goalForm.targetValue) <= 0) {
+      toast({ title: "Target value must be greater than 0", variant: "destructive" }); return;
+    }
+    setGoalSaving(true);
+    try {
+      // Merge new goal with existing active goals so we don't overwrite them
+      const existing = (dashboardData?.activeGoals || []).map(g => ({
+        _id: g._id,
+        type: g.type,
+        title: g.title,
+        targetValue: g.targetValue,
+        currentValue: g.currentValue,
+        unit: g.unit,
+        period: g.period,
+      }));
+      const newGoal = {
+        type: goalForm.type,
+        title: goalForm.title,
+        targetValue: Number(goalForm.targetValue),
+        currentValue: 0,
+        unit: goalForm.unit,
+        period: goalForm.period,
+        ...(goalForm.endDate ? { endDate: goalForm.endDate } : {}),
+      };
+      await apiService.updateGoals([...existing, newGoal]);
+      toast({ title: "Goal added!", description: `"${goalForm.title}" has been set.` });
+      setShowGoalDialog(false);
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to save goal", variant: "destructive" });
+    } finally {
+      setGoalSaving(false);
     }
   };
 
@@ -434,10 +504,11 @@ const UserDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="goals">Goals</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
@@ -722,36 +793,68 @@ const UserDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Achievements */}
+              {/* Achievements — derived from real user stats */}
               <Card>
                 <CardHeader>
                   <CardTitle>Recent Achievements</CardTitle>
-                  <CardDescription>Your fitness milestones</CardDescription>
+                  <CardDescription>Milestones earned from your activity</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
-                      <Award className="w-8 h-8 text-yellow-600" />
-                      <div>
-                        <p className="font-semibold">7-Day Streak!</p>
-                        <p className="text-sm text-muted-foreground">Completed workouts 7 days in a row</p>
+                  {(() => {
+                    const earned: { icon: React.ReactNode; title: string; desc: string; bg: string }[] = [];
+                    const stats = dashboardData.user.stats;
+                    const streak = dashboardData.currentStreak ?? 0;
+                    const totalWorkouts = stats?.totalWorkouts ?? 0;
+                    const totalCalories = stats?.totalCalories ?? 0;
+                    const weeklyCalories = dashboardData.weeklyStats?.totalCalories ?? 0;
+                    const weeklyWorkouts = dashboardData.weeklyStats?.workoutSessions ?? 0;
+
+                    if (streak >= 7)
+                      earned.push({ icon: <Award className="w-8 h-8 text-yellow-600" />, title: `${streak}-Day Streak!`, desc: `You've worked out ${streak} days in a row`, bg: 'bg-yellow-50 dark:bg-yellow-950/20' });
+                    else if (streak >= 3)
+                      earned.push({ icon: <Award className="w-8 h-8 text-orange-500" />, title: `${streak}-Day Streak`, desc: `Keep going — ${7 - streak} more days for a 7-day streak`, bg: 'bg-orange-50 dark:bg-orange-950/20' });
+
+                    if (totalWorkouts >= 100)
+                      earned.push({ icon: <Zap className="w-8 h-8 text-purple-600" />, title: 'Century Club', desc: '100+ workouts completed', bg: 'bg-purple-50 dark:bg-purple-950/20' });
+                    else if (totalWorkouts >= 50)
+                      earned.push({ icon: <Zap className="w-8 h-8 text-blue-600" />, title: '50 Workouts', desc: '50 workouts completed', bg: 'bg-blue-50 dark:bg-blue-950/20' });
+                    else if (totalWorkouts >= 10)
+                      earned.push({ icon: <Zap className="w-8 h-8 text-blue-500" />, title: '10 Workouts', desc: '10 workouts completed', bg: 'bg-blue-50 dark:bg-blue-950/20' });
+                    else if (totalWorkouts >= 1)
+                      earned.push({ icon: <Zap className="w-8 h-8 text-green-500" />, title: 'First Workout!', desc: 'You completed your first workout', bg: 'bg-green-50 dark:bg-green-950/20' });
+
+                    if (weeklyCalories >= 2000)
+                      earned.push({ icon: <Heart className="w-8 h-8 text-green-600" />, title: 'Calorie Burner', desc: `Burned ${weeklyCalories.toLocaleString()} calories this week`, bg: 'bg-green-50 dark:bg-green-950/20' });
+
+                    if (weeklyWorkouts >= (dashboardData.activeGoals?.[0]?.targetValue ?? 999) && dashboardData.activeGoals?.length > 0)
+                      earned.push({ icon: <Target className="w-8 h-8 text-blue-600" />, title: 'Goal Crusher', desc: 'Reached your weekly workout goal', bg: 'bg-blue-50 dark:bg-blue-950/20' });
+
+                    if (totalCalories >= 10000)
+                      earned.push({ icon: <Flame className="w-8 h-8 text-red-500" />, title: '10k Calories', desc: 'Burned 10,000 total calories', bg: 'bg-red-50 dark:bg-red-950/20' });
+
+                    if (earned.length === 0) {
+                      return (
+                        <div className="text-center py-10">
+                          <Award className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+                          <p className="text-muted-foreground text-sm">Complete workouts to earn achievements</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {earned.slice(0, 4).map((a, i) => (
+                          <div key={i} className={`flex items-center gap-3 p-3 rounded-lg ${a.bg}`}>
+                            {a.icon}
+                            <div>
+                              <p className="font-semibold">{a.title}</p>
+                              <p className="text-sm text-muted-foreground">{a.desc}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                      <Target className="w-8 h-8 text-blue-600" />
-                      <div>
-                        <p className="font-semibold">Goal Crusher</p>
-                        <p className="text-sm text-muted-foreground">Reached your weekly workout goal</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                      <Heart className="w-8 h-8 text-green-600" />
-                      <div>
-                        <p className="font-semibold">Calorie Burner</p>
-                        <p className="text-sm text-muted-foreground">Burned 1000+ calories this week</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
@@ -771,7 +874,7 @@ const UserDashboard = () => {
                       <CardTitle>Active Goals</CardTitle>
                       <CardDescription>Track your fitness objectives</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={openGoalDialog}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Goal
                     </Button>
@@ -798,7 +901,7 @@ const UserDashboard = () => {
                             <Progress value={percentage} className="h-3" />
                             <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
                               <span>{percentage >= 100 ? "Goal completed!" : `${(goal.targetValue - goal.currentValue).toFixed(0)} ${goal.unit} to go`}</span>
-                              <span>Target: {new Date(goal.deadline).toLocaleDateString()}</span>
+                              <span>Target: {goal.endDate ? new Date(goal.endDate).toLocaleDateString() : '—'}</span>
                             </div>
                           </div>
                         );
@@ -809,7 +912,7 @@ const UserDashboard = () => {
                           <Target className="w-8 h-8 text-muted-foreground" />
                         </div>
                         <p className="text-muted-foreground mb-4">No active goals set</p>
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={openGoalDialog}>
                           <Plus className="w-4 h-4 mr-2" />
                           Set Your First Goal
                         </Button>
@@ -819,42 +922,56 @@ const UserDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Goal Suggestions */}
+              {/* Goal Suggestions — based on real user activity */}
               <Card>
                 <CardHeader>
                   <CardTitle>Suggested Goals</CardTitle>
-                  <CardDescription>Based on your activity</CardDescription>
+                  <CardDescription>Based on your recent activity</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Dumbbell className="w-5 h-5 text-primary" />
-                        <div className="flex-1">
-                          <p className="font-medium">Workout 5 times this week</p>
-                          <p className="text-sm text-muted-foreground">Increase your frequency</p>
-                        </div>
+                  {(() => {
+                    const weekly = dashboardData.weeklyStats;
+                    const avg = dashboardData.avgWorkoutsPerWeek ?? 0;
+                    const suggestions = [];
+
+                    // Suggest slightly above current average
+                    const targetSessions = Math.max(3, avg + 1);
+                    suggestions.push({
+                      icon: <Dumbbell className="w-5 h-5 text-primary" />,
+                      title: `Workout ${targetSessions}× this week`,
+                      desc: avg > 0 ? `You averaged ${avg} sessions/week` : 'Build a consistent routine',
+                    });
+
+                    const targetCalories = Math.max(1500, Math.round((weekly.totalCalories || 1000) * 1.2 / 100) * 100);
+                    suggestions.push({
+                      icon: <Flame className="w-5 h-5 text-destructive" />,
+                      title: `Burn ${targetCalories.toLocaleString()} calories`,
+                      desc: weekly.totalCalories > 0 ? `You burned ${weekly.totalCalories} last week` : 'Weekly calorie goal',
+                    });
+
+                    const targetMinutes = Math.max(150, Math.round((weekly.totalMinutes || 120) * 1.2 / 30) * 30);
+                    suggestions.push({
+                      icon: <Clock className="w-5 h-5 text-success" />,
+                      title: `${targetMinutes} active minutes`,
+                      desc: weekly.totalMinutes > 0 ? `You logged ${weekly.totalMinutes} min last week` : 'Weekly time goal',
+                    });
+
+                    return (
+                      <div className="space-y-3">
+                        {suggestions.map((s, i) => (
+                          <div key={i} className="p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                            <div className="flex items-center gap-3">
+                              {s.icon}
+                              <div className="flex-1">
+                                <p className="font-medium text-sm">{s.title}</p>
+                                <p className="text-xs text-muted-foreground">{s.desc}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <div className="p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Flame className="w-5 h-5 text-destructive" />
-                        <div className="flex-1">
-                          <p className="font-medium">Burn 2000 calories</p>
-                          <p className="text-sm text-muted-foreground">Weekly calorie goal</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Clock className="w-5 h-5 text-success" />
-                        <div className="flex-1">
-                          <p className="font-medium">300 active minutes</p>
-                          <p className="text-sm text-muted-foreground">Weekly time goal</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -890,6 +1007,15 @@ const UserDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-heading font-bold mb-1">Payment History</h2>
+              <p className="text-muted-foreground mb-6">All payments made for session bookings and subscriptions</p>
+              <PaymentHistory />
             </div>
           </TabsContent>
 
@@ -1133,6 +1259,94 @@ const UserDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ── Add Goal Dialog ── */}
+      <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add a Goal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+
+            <div className="space-y-2">
+              <Label>Goal Type</Label>
+              <Select value={goalForm.type} onValueChange={handleGoalTypeChange}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="workout-sessions">Workout Sessions</SelectItem>
+                  <SelectItem value="active-minutes">Active Minutes</SelectItem>
+                  <SelectItem value="calories-burned">Calories Burned</SelectItem>
+                  <SelectItem value="weight-loss">Weight Loss</SelectItem>
+                  <SelectItem value="weight-gain">Weight Gain</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Goal Title</Label>
+              <Input
+                placeholder="e.g. Complete 5 workouts this week"
+                value={goalForm.title}
+                onChange={e => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Target Value</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 5"
+                  value={goalForm.targetValue}
+                  onChange={e => setGoalForm(prev => ({ ...prev, targetValue: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Input
+                  placeholder="e.g. sessions"
+                  value={goalForm.unit}
+                  onChange={e => setGoalForm(prev => ({ ...prev, unit: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Period</Label>
+              <Select value={goalForm.period} onValueChange={v => setGoalForm(prev => ({ ...prev, period: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Target Date <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                type="date"
+                value={goalForm.endDate}
+                min={new Date().toISOString().split("T")[0]}
+                onChange={e => setGoalForm(prev => ({ ...prev, endDate: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button onClick={handleSaveGoal} disabled={goalSaving} className="flex-1">
+                {goalSaving ? "Saving…" : "Save Goal"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowGoalDialog(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

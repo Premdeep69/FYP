@@ -12,10 +12,12 @@ router.get("/trainers/:trainerId/slots", bookingController.getAvailableSlots);
 // Protected routes - User bookings
 router.post("/", protect, bookingController.createBooking);
 router.get("/my-bookings", protect, bookingController.getUserBookings);
+router.get("/:bookingId/payment-intent", protect, bookingController.getBookingPaymentIntent);
 router.put("/:bookingId/status", protect, bookingController.updateBookingStatus);
 router.post("/:bookingId/feedback", protect, bookingController.addFeedback);
 router.post("/:bookingId/confirm-payment", protect, bookingController.confirmBookingPayment);
 router.post("/:bookingId/cancel-with-refund", protect, bookingController.cancelBookingWithRefund);
+router.post("/:bookingId/cancel-as-trainer", protect, bookingController.cancelBookingAsTrainer);
 
 // Protected routes - Trainer management
 router.get("/trainer/bookings", protect, bookingController.getTrainerBookings);

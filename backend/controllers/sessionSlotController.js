@@ -14,9 +14,7 @@ class SessionSlotController {
         sessionType,
         mode,
         location,
-        meetingType,
         meetingLink,
-        meetingAccessControl,
         date,
         startTime,
         endTime,
@@ -78,9 +76,7 @@ class SessionSlotController {
         sessionType,
         mode,
         location,
-        meetingType,
         meetingLink,
-        meetingAccessControl,
         date: slotDate,
         startTime,
         endTime,
@@ -452,6 +448,7 @@ class SessionSlotController {
         status: "pending",
         paymentStatus: "pending",
         clientNotes: notes,
+        slotId: slot._id,
       });
 
       // Add participant to slot
@@ -525,6 +522,7 @@ class SessionSlotController {
             trainerId: slot.trainerId._id,
             sessionId: booking._id,
             stripePaymentIntentId: paymentIntent.id,
+            stripeClientSecret: paymentIntent.client_secret,
             stripeCustomerId: customer.id,
             amount: Math.round(slot.price * 100),
             paymentType: 'session',
@@ -663,9 +661,7 @@ class SessionSlotController {
         sessionType: originalSlot.sessionType,
         mode: originalSlot.mode,
         location: originalSlot.location,
-        meetingType: originalSlot.meetingType,
         meetingLink: originalSlot.meetingLink,
-        meetingAccessControl: originalSlot.meetingAccessControl,
         date: new Date(date),
         startTime: startTime || originalSlot.startTime,
         endTime: endTime || originalSlot.endTime,
@@ -690,55 +686,29 @@ class SessionSlotController {
     }
   };
 
-  // Get meeting info for a slot (only for participants and trainer)
+  // Get meeting info for a slot — returns external meeting link for participants and trainer
   getMeetingInfo = async (req, res) => {
     try {
       const { slotId } = req.params;
       const userId = req.user._id;
 
       const slot = await SessionSlot.findById(slotId);
+      if (!slot) return res.status(404).json({ message: "Slot not found" });
 
-      if (!slot) {
-        return res.status(404).json({ message: "Slot not found" });
-      }
-
-      // Check if user is trainer or has booked the slot
+      // Access check: must be the trainer or a booked participant
       const isTrainer = slot.trainerId.toString() === userId.toString();
       const hasBooked = slot.bookedBy.some(
-        (booking) => booking.userId.toString() === userId.toString() && booking.hasAccess
+        (b) => b.userId.toString() === userId.toString() && b.hasAccess
       );
 
       if (!isTrainer && !hasBooked) {
-        return res.status(403).json({ 
-          message: "You don't have access to this meeting" 
-        });
+        return res.status(403).json({ message: "You don't have access to this session" });
       }
 
-      // Check if meeting is available yet (based on early join settings)
-      const now = new Date();
-      const sessionDateTime = new Date(slot.date);
-      const [hours, minutes] = slot.startTime.split(':');
-      sessionDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-      const earlyJoinTime = new Date(sessionDateTime);
-      if (slot.meetingAccessControl?.allowEarlyJoin) {
-        earlyJoinTime.setMinutes(
-          earlyJoinTime.getMinutes() - (slot.meetingAccessControl.earlyJoinMinutes || 10)
-        );
-      }
-
-      if (now < earlyJoinTime) {
-        return res.status(403).json({ 
-          message: "Meeting is not available yet",
-          availableAt: earlyJoinTime,
-        });
-      }
-
-      const meetingInfo = slot.getMeetingInfo(userId);
-
-      if (!meetingInfo) {
-        return res.status(404).json({ message: "No meeting configured for this slot" });
-      }
+      // Return the external meeting link if one was set
+      const meetingInfo = slot.meetingLink
+        ? { type: 'external', link: slot.meetingLink }
+        : null;
 
       res.json({
         meetingInfo,
@@ -752,37 +722,6 @@ class SessionSlotController {
       });
     } catch (error) {
       console.error("Get meeting info error:", error);
-      res.status(500).json({ message: error.message });
-    }
-  };
-
-  // Generate new video call room for a slot
-  regenerateVideoCallRoom = async (req, res) => {
-    try {
-      const { slotId } = req.params;
-      const trainerId = req.user._id;
-
-      const slot = await SessionSlot.findOne({ _id: slotId, trainerId });
-
-      if (!slot) {
-        return res.status(404).json({ message: "Slot not found" });
-      }
-
-      if (slot.meetingType !== 'builtin') {
-        return res.status(400).json({ 
-          message: "Can only regenerate room for built-in video calls" 
-        });
-      }
-
-      const roomInfo = slot.generateVideoCallRoom();
-      await slot.save();
-
-      res.json({
-        message: "Video call room regenerated successfully",
-        roomInfo,
-      });
-    } catch (error) {
-      console.error("Regenerate video call room error:", error);
       res.status(500).json({ message: error.message });
     }
   };

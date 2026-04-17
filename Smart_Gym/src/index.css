@@ -2,123 +2,236 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 13% 13%;
+    /* ── Neutrals ── */
+    --background: 0 0% 99%;
+    --foreground: 222 20% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 13% 13%;
+    --card-foreground: 222 20% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 13% 13%;
+    --popover-foreground: 222 20% 12%;
 
-    /* Deep ocean blue - primary brand */
-    --primary: 211 100% 35%;
+    /* ── Brand: deep indigo-blue ── */
+    --primary: 234 89% 54%;
     --primary-foreground: 0 0% 100%;
 
-    /* Vibrant lime green - energy accent */
-    --secondary: 84 81% 44%;
-    --secondary-foreground: 220 13% 13%;
+    /* ── Accent: vivid violet ── */
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 52%;
 
-    --accent: 84 81% 44%;
-    --accent-foreground: 220 13% 13%;
+    --accent: 234 89% 96%;
+    --accent-foreground: 234 89% 40%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 211 100% 35%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 234 89% 54%;
 
-    --radius: 0.75rem;
+    --radius: 0.625rem;
 
-    /* Fitness-specific tokens */
-    --hero-gradient-start: 211 100% 35%;
-    --hero-gradient-end: 220 13% 13%;
-    --energy-glow: 84 81% 44%;
-    --success: 142 76% 36%;
+    /* ── Semantic ── */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
 
-    /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-    --shadow-glow: 0 0 32px hsla(var(--energy-glow), 0.3);
+    /* ── Shadows ── */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+    --shadow-glow: 0 0 0 3px hsl(234 89% 54% / 0.15);
+    --shadow-brand: 0 8px 24px hsl(234 89% 54% / 0.25);
   }
 
   .dark {
-    --background: 220 13% 13%;
-    --foreground: 0 0% 98%;
-
-    --card: 220 13% 18%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 220 13% 18%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 211 100% 45%;
+    --background: 222 20% 9%;
+    --foreground: 210 20% 96%;
+    --card: 222 20% 12%;
+    --card-foreground: 210 20% 96%;
+    --popover: 222 20% 12%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 234 89% 62%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 84 81% 44%;
-    --secondary-foreground: 220 13% 13%;
-
-    --muted: 220 13% 25%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 84 81% 44%;
-    --accent-foreground: 220 13% 13%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 220 13% 25%;
-    --input: 220 13% 25%;
-    --ring: 211 100% 45%;
+    --secondary: 262 83% 65%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 222 20% 18%;
+    --muted-foreground: 220 9% 58%;
+    --accent: 234 89% 18%;
+    --accent-foreground: 234 89% 75%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 20% 20%;
+    --input: 222 20% 20%;
+    --ring: 234 89% 62%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
+  html { scroll-behavior: smooth; }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
     font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Smooth focus rings */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Better scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/40; }
+}
+
+@layer components {
+  /* ── Card variants ── */
+  .card-elevated {
+    @apply bg-card rounded-xl border border-border/60 shadow-md;
+  }
+  .card-flat {
+    @apply bg-card rounded-xl border border-border;
+  }
+  .card-ghost {
+    @apply bg-muted/50 rounded-xl border border-transparent;
+  }
+
+  /* ── Gradient text ── */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+
+  /* ── Hero gradient ── */
+  .hero-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  }
+  .hero-gradient-subtle {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, hsl(var(--secondary) / 0.08) 100%);
+  }
+
+  /* ── Stat card ── */
+  .stat-card {
+    @apply bg-card rounded-xl border border-border/60 p-5 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  /* ── Badge pill ── */
+  .badge-pill {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* ── Section container ── */
+  .section {
+    @apply py-16 md:py-24;
+  }
+  .section-sm {
+    @apply py-10 md:py-16;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    @apply mb-8;
+  }
+  .page-title {
+    @apply text-3xl md:text-4xl font-bold tracking-tight text-foreground;
+  }
+  .page-subtitle {
+    @apply text-base text-muted-foreground mt-1.5;
   }
 }
 
 @layer utilities {
-  .hero-gradient {
-    background: linear-gradient(135deg, hsl(var(--hero-gradient-start)), hsl(var(--hero-gradient-end)));
+  /* ── Hover lift ── */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
   }
-  
-  .energy-glow {
-    box-shadow: var(--shadow-glow);
-  }
-
-  .card-hover {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  .hover-lift:hover {
+    @apply -translate-y-0.5 shadow-lg;
   }
 
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+  /* ── Glass effect ── */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+  .glass-dark {
+    @apply bg-black/20 backdrop-blur-md border border-white/10;
+  }
+
+  /* ── Gradient border ── */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+  }
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* ── Shimmer loading ── */
+  .shimmer {
+    background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--border)) 50%, hsl(var(--muted)) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ── Fade in ── */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Dot indicator ── */
+  .dot-online {
+    @apply w-2 h-2 rounded-full bg-green-500 ring-2 ring-white;
   }
 }
 
-
+/* Hide Stripe's auto-injected badge */
+.StripeElement--webkit-autofill,
+a[href="https://stripe.com"] img,
+.stripe-badge,
+[data-testid="stripe-badge"] {
+  display: none !important;
+}

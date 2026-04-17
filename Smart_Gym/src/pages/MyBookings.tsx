@@ -1,32 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Calendar,
-  Clock,
-  DollarSign,
-  MapPin,
-  Star,
-  XCircle,
-  CheckCircle,
-  AlertCircle,
-  Video,
+  Calendar, Clock, DollarSign, Star, XCircle, CheckCircle,
+  AlertCircle, Video, FileText, Loader2, CreditCard, RefreshCw,
 } from 'lucide-react';
 import { apiService } from '@/services/api';
+import { socketService } from '@/services/socket';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import MeetingInfo from '@/components/MeetingInfo';
 
 interface Booking {
@@ -44,6 +35,8 @@ interface Booking {
   status: string;
   price: number;
   paymentStatus: string;
+  paymentId?: string;
+  slotId?: { _id: string } | string;
   clientNotes?: string;
   trainerNotes?: string;
   feedback?: {
@@ -54,6 +47,7 @@ interface Booking {
 
 const MyBookings: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -61,26 +55,57 @@ const MyBookings: React.FC = () => {
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [showMeetingInfo, setShowMeetingInfo] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
-      const data = await apiService.getUserBookings();
+      const data: any = await apiService.getUserBookings();
       setBookings(data.bookings);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to load bookings',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message || 'Failed to load bookings', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  // Real-time: refresh when a booking is confirmed via payment
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+    const onConfirmed = () => {
+      fetchBookings();
+      toast({ title: '✅ Booking Confirmed!', description: 'Your payment was successful and session is confirmed.' });
+    };
+    socket.on('booking:new_confirmed', onConfirmed);
+    return () => { socket.off('booking:new_confirmed', onConfirmed); };
+  }, [fetchBookings]);
+
+  const handleDownloadReceipt = async (booking: Booking) => {
+    if (!booking.paymentId) {
+      toast({ title: 'No receipt available', description: 'Receipt is only available for paid bookings.', variant: 'destructive' });
+      return;
+    }
+    setDownloadingId(booking._id);
+    try {
+      const res: any = await apiService.generateInvoice(booking.paymentId);
+      const invoiceNum = res.invoiceNumber;
+      if (!invoiceNum) throw new Error('Invoice not available');
+      const blob = await apiService.downloadInvoice(`invoice-${invoiceNum}.pdf`) as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${invoiceNum}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: 'Could not download receipt', description: e.message, variant: 'destructive' });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
@@ -97,23 +122,19 @@ const MyBookings: React.FC = () => {
     try {
       setProcessing(true);
       
-      // Use cancel with refund endpoint if payment was made
+      // Use cancel with refund endpoint if payment was made and not already refunded
       if (selectedBooking.paymentStatus === 'paid') {
-        const response = await apiService.cancelBookingWithRefund(selectedBooking._id, cancelReason);
-        
+        const response: any = await apiService.cancelBookingWithRefund(selectedBooking._id, cancelReason);
+        const refund = response.refund;
         toast({
           title: 'Booking Cancelled',
-          description: response.refunded 
-            ? 'Your booking has been cancelled and payment refunded'
-            : 'Your booking has been cancelled',
+          description: refund?.processed
+            ? `A 70% refund of $${refund.refundAmount} has been processed. A 30% cancellation fee of $${refund.cancellationFee} was retained.`
+            : 'Your booking has been cancelled.',
         });
       } else {
         await apiService.updateBookingStatus(selectedBooking._id, 'cancelled', cancelReason);
-        
-        toast({
-          title: 'Booking Cancelled',
-          description: 'Your booking has been cancelled successfully',
-        });
+        toast({ title: 'Booking Cancelled', description: 'Your booking has been cancelled successfully.' });
       }
       
       setShowCancelDialog(false);
@@ -135,7 +156,7 @@ const MyBookings: React.FC = () => {
     if (!selectedBooking || rating === 0) {
       toast({
         title: 'Missing Information',
-        description: 'Please provide a rating',
+        description: 'Please select a rating before submitting.',
         variant: 'destructive',
       });
       return;
@@ -143,21 +164,29 @@ const MyBookings: React.FC = () => {
 
     try {
       setProcessing(true);
-      await apiService.addBookingFeedback(selectedBooking._id, rating, feedbackComment);
-      
+      const res: any = await apiService.addBookingFeedback(
+        selectedBooking._id,
+        rating,
+        feedbackComment
+      );
+
+      const trainerRating = res.trainerRating;
       toast({
         title: 'Feedback Submitted',
-        description: 'Thank you for your feedback!',
+        description: trainerRating
+          ? `Thank you! ${selectedBooking.trainerId.name}'s rating is now ${trainerRating.average.toFixed(1)}/5 (${trainerRating.count} reviews).`
+          : 'Thank you for your feedback!',
       });
 
       setShowFeedbackDialog(false);
       setRating(0);
       setFeedbackComment('');
+      setSelectedBooking(null);
       fetchBookings();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to submit feedback',
+        description: error.message || 'Failed to submit feedback.',
         variant: 'destructive',
       });
     } finally {
@@ -167,31 +196,23 @@ const MyBookings: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending':   return 'bg-yellow-100 text-yellow-800';
+      case 'pending_payment': return 'bg-blue-100 text-blue-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default:          return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'confirmed':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'pending':
-        return <AlertCircle className="w-4 h-4" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'cancelled':
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <AlertCircle className="w-4 h-4" />;
+      case 'confirmed': return <CheckCircle className="w-4 h-4" />;
+      case 'pending':   return <AlertCircle className="w-4 h-4" />;
+      case 'pending_payment': return <CreditCard className="w-4 h-4" />;
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      case 'cancelled': return <XCircle className="w-4 h-4" />;
+      default:          return <AlertCircle className="w-4 h-4" />;
     }
   };
 
@@ -291,43 +312,92 @@ const MyBookings: React.FC = () => {
               </div>
             )}
 
-            <div className="flex gap-2">
-              {booking.status === 'pending' && (
+            <div className="flex flex-wrap gap-2">
+              {/* Pending payment — fetch clientSecret and redirect to payment page */}
+              {booking.paymentStatus === 'pending' && booking.status === 'pending' && (
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 gap-1.5"
+                  disabled={downloadingId === booking._id}
+                  onClick={async () => {
+                    setDownloadingId(booking._id);
+                    try {
+                      const res: any = await apiService.getBookingPaymentIntent(booking._id);
+                      if (!res.clientSecret) throw new Error('Payment details unavailable');
+                      const params = new URLSearchParams({
+                        clientSecret: res.clientSecret,
+                        bookingId: booking._id,
+                        amount: String(res.amount || booking.price),
+                        trainerName: encodeURIComponent(booking.trainerId?.name || 'Trainer'),
+                        sessionType: booking.sessionType || '',
+                        sessionDate: booking.scheduledDate || '',
+                      });
+                      navigate(`/booking-payment?${params.toString()}`);
+                    } catch (e: any) {
+                      toast({ title: 'Could not load payment', description: e.message, variant: 'destructive' });
+                    } finally {
+                      setDownloadingId(null);
+                    }
+                  }}
+                >
+                  {downloadingId === booking._id
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+                    : <><CreditCard className="w-4 h-4" /> Complete Payment</>}
+                </Button>
+              )}
+
+              {booking.status === 'pending' && booking.paymentStatus !== 'pending' && (
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => {
-                    setSelectedBooking(booking);
-                    setShowCancelDialog(true);
-                  }}
+                  onClick={() => { setSelectedBooking(booking); setShowCancelDialog(true); }}
                 >
                   Cancel Booking
                 </Button>
               )}
-              {(booking.status === 'confirmed' || booking.status === 'pending') && (
+
+              {booking.status === 'confirmed' && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { setSelectedBooking(booking); setShowCancelDialog(true); }}
+                >
+                  Cancel Booking
+                </Button>
+              )}
+
+              {(booking.status === 'confirmed' || booking.status === 'pending') && booking.slotId && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSelectedBooking(booking);
-                    setShowMeetingInfo(true);
-                  }}
+                  onClick={() => { setSelectedBooking(booking); setShowMeetingInfo(true); }}
                 >
-                  <Video className="w-4 h-4 mr-2" />
-                  Join Meeting
+                  <Video className="w-4 h-4 mr-2" /> Join Meeting
                 </Button>
               )}
+
               {booking.status === 'completed' && !booking.feedback && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setSelectedBooking(booking);
-                    setShowFeedbackDialog(true);
-                  }}
+                  onClick={() => { setSelectedBooking(booking); setShowFeedbackDialog(true); }}
                 >
-                  <Star className="w-4 h-4 mr-2" />
-                  Leave Feedback
+                  <Star className="w-4 h-4 mr-2" /> Leave Feedback
+                </Button>
+              )}
+
+              {/* Receipt download for paid bookings */}
+              {booking.paymentStatus === 'paid' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-indigo-600 hover:text-indigo-700"
+                  disabled={downloadingId === booking._id}
+                  onClick={() => handleDownloadReceipt(booking)}
+                >
+                  {downloadingId === booking._id
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Downloading…</>
+                    : <><FileText className="w-4 h-4" /> Receipt</>}
                 </Button>
               )}
             </div>
@@ -351,19 +421,28 @@ const MyBookings: React.FC = () => {
   return (
     <div className="min-h-screen py-12">
       <div className="container mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-heading font-bold mb-4">
-            My Bookings
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            View and manage your training sessions
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-heading font-bold mb-2">My Bookings</h1>
+            <p className="text-lg text-muted-foreground">View and manage your training sessions</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchBookings} className="shrink-0 mt-2">
+            <RefreshCw className="w-4 h-4 mr-1.5" /> Refresh
+          </Button>
         </div>
 
         <Tabs defaultValue="upcoming" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="upcoming">
               Upcoming ({filterBookings(['pending', 'confirmed']).length})
+            </TabsTrigger>
+            <TabsTrigger value="pending_payment" className="relative">
+              Awaiting Payment
+              {filterBookings(['pending']).filter(b => b.paymentStatus === 'pending').length > 0 && (
+                <span className="ml-1.5 bg-blue-500 text-white text-xs rounded-full px-1.5">
+                  {filterBookings(['pending']).filter(b => b.paymentStatus === 'pending').length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="completed">
               Completed ({filterBookings(['completed']).length})
@@ -375,18 +454,30 @@ const MyBookings: React.FC = () => {
           </TabsList>
 
           <TabsContent value="upcoming" className="space-y-4">
-            {filterBookings(['pending', 'confirmed']).length === 0 ? (
+            {filterBookings(['pending', 'confirmed']).filter(b => b.paymentStatus !== 'pending').length === 0 ? (
               <Card className="p-8 text-center">
                 <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Upcoming Bookings</h3>
-                <p className="text-muted-foreground">
-                  You don't have any upcoming sessions scheduled
-                </p>
+                <p className="text-muted-foreground">You don't have any upcoming sessions scheduled</p>
               </Card>
             ) : (
-              filterBookings(['pending', 'confirmed']).map((booking) => (
-                <BookingCard key={booking._id} booking={booking} />
-              ))
+              filterBookings(['pending', 'confirmed'])
+                .filter(b => b.paymentStatus !== 'pending')
+                .map(booking => <BookingCard key={booking._id} booking={booking} />)
+            )}
+          </TabsContent>
+
+          <TabsContent value="pending_payment" className="space-y-4">
+            {filterBookings(['pending']).filter(b => b.paymentStatus === 'pending').length === 0 ? (
+              <Card className="p-8 text-center">
+                <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Pending Payments</h3>
+                <p className="text-muted-foreground">All your bookings are up to date</p>
+              </Card>
+            ) : (
+              filterBookings(['pending'])
+                .filter(b => b.paymentStatus === 'pending')
+                .map(booking => <BookingCard key={booking._id} booking={booking} />)
             )}
           </TabsContent>
 
@@ -452,6 +543,13 @@ const MyBookings: React.FC = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {selectedBooking?.paymentStatus === 'paid' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <p className="font-semibold mb-1">Cancellation Policy</p>
+                  <p>A <span className="font-bold">70% refund</span> (${((selectedBooking.price) * 0.7).toFixed(2)}) will be processed to your original payment method.</p>
+                  <p className="text-xs mt-1 text-amber-600">A 30% cancellation fee (${((selectedBooking.price) * 0.3).toFixed(2)}) will be retained.</p>
+                </div>
+              )}
               <div>
                 <Label htmlFor="reason">Cancellation Reason</Label>
                 <Textarea
@@ -464,18 +562,10 @@ const MyBookings: React.FC = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowCancelDialog(false)}
-                disabled={processing}
-              >
+              <Button variant="outline" onClick={() => setShowCancelDialog(false)} disabled={processing}>
                 Keep Booking
               </Button>
-              <Button
-                variant="destructive"
-                onClick={handleCancelBooking}
-                disabled={processing || !cancelReason.trim()}
-              >
+              <Button variant="destructive" onClick={handleCancelBooking} disabled={processing || !cancelReason.trim()}>
                 {processing ? 'Cancelling...' : 'Cancel Booking'}
               </Button>
             </DialogFooter>
@@ -542,9 +632,9 @@ const MyBookings: React.FC = () => {
         </Dialog>
 
         {/* Meeting Info Dialog */}
-        {selectedBooking && (
+        {selectedBooking && selectedBooking.slotId && (
           <MeetingInfo
-            slotId={selectedBooking._id}
+            slotId={typeof selectedBooking.slotId === 'string' ? selectedBooking.slotId : selectedBooking.slotId._id}
             slotTitle={`Session with ${selectedBooking.trainerId.name}`}
             slotDate={selectedBooking.scheduledDate}
             slotStartTime={selectedBooking.startTime}

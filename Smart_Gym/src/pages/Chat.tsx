@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, Phone, Video, MoreVertical, Plus } from "lucide-react";
+import { Send, Search, MoreVertical, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { apiService } from "@/services/api";
@@ -82,6 +82,13 @@ const Chat = () => {
   const setupSocketListeners = () => {
     // Listen for new messages
     socketService.onNewMessage((message: Message) => {
+      // Ignore messages sent by the current user — they already see it in the UI
+      const currentUserId = user?._id || (user as any)?.id;
+      if (message.senderId?._id === currentUserId || message.senderId === currentUserId) {
+        loadConversations();
+        return;
+      }
+
       const isActiveChat = activeConversation && message.conversationId === activeConversation.conversationId;
       
       if (isActiveChat) {
@@ -89,7 +96,7 @@ const Chat = () => {
         // Mark as read if conversation is active
         socketService.markAsRead(message._id, message.conversationId);
       } else {
-        // Add notification for messages in other conversations
+        // Add notification only for the recipient, for messages in other conversations
         const senderName = message.senderId?.name || 'Someone';
         addNotification({
           type: 'new_message',
@@ -114,8 +121,12 @@ const Chat = () => {
       }
     });
 
-    // Listen for message notifications
+    // Listen for message notifications (only fires for the recipient)
     socketService.onMessageNotification((notification) => {
+      const currentUserId = user?._id || (user as any)?.id;
+      // Skip if this notification is about our own message
+      if (notification.senderId === currentUserId) return;
+
       if (!activeConversation || notification.conversationId !== activeConversation.conversationId) {
         toast({
           title: `New message from ${notification.senderName}`,
@@ -449,12 +460,6 @@ const Chat = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="ghost">
-                      <Phone className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      <Video className="w-4 h-4" />
-                    </Button>
                     <Button size="sm" variant="ghost">
                       <MoreVertical className="w-4 h-4" />
                     </Button>

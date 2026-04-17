@@ -17,7 +17,6 @@ import MyBookings from "./pages/MyBookings";
 import TrainerManagement from "./pages/TrainerManagement";
 import SessionSlots from "./pages/SessionSlots";
 import Chat from "./pages/Chat";
-import VideoCall from "./pages/VideoCall";
 import Dashboard from "./pages/Dashboard";
 import UserDashboard from "./pages/UserDashboard";
 import TrainerDashboard from "./pages/TrainerDashboard";
@@ -27,7 +26,13 @@ import BookingPayment from "./pages/BookingPayment";
 import NotificationTest from "./pages/NotificationTest";
 import AdminDashboard from "./pages/AdminDashboard";
 import PendingApproval from "./pages/PendingApproval";
+import BrowseSlots from "./pages/BrowseSlots";
+import MyRequests from "./pages/MyRequests";
+import AccountDeleted from "./pages/AccountDeleted";
 import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -52,15 +57,20 @@ const App = () => (
               <Route path="/trainer-management" element={<Layout children={<TrainerManagement />} />} />
               <Route path="/session-slots" element={<Layout children={<SessionSlots />} />} />
               <Route path="/chat" element={<Layout children={<Chat />} />} />
-              <Route path="/video-call" element={<Layout children={<VideoCall />} />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Layout children={<Dashboard />} />} />
               <Route path="/user-dashboard" element={<Layout children={<UserDashboard />} />} />
               <Route path="/trainer-dashboard" element={<Layout children={<TrainerDashboard />} />} />
               <Route path="/notification-test" element={<Layout children={<NotificationTest />} />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/pending-approval" element={<PendingApproval />} />
+              <Route path="/browse-slots" element={<Layout children={<BrowseSlots />} />} />
+              <Route path="/my-requests" element={<Layout children={<MyRequests />} />} />
+              <Route path="/account-deleted" element={<AccountDeleted />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

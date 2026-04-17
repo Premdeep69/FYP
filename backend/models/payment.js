@@ -19,6 +19,9 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    stripeClientSecret: {
+      type: String, // stored temporarily for pending payments
+    },
     stripeCustomerId: {
       type: String,
     },
@@ -55,7 +58,8 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
     },
     refundedAt: Date,
-    refundAmount: Number,
+    refundAmount: Number,      // actual refunded amount in cents
+    refundPercentage: Number,  // 70 or 100
     refundId: String,
     refundReason: String,
     // Invoice fields

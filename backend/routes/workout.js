@@ -10,6 +10,7 @@ import {
   logWorkoutCompletion,
   getWorkoutPlanFilters,
   getPopularWorkoutPlans,
+  rateWorkoutPlan,
 } from "../controllers/workoutController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -26,12 +27,13 @@ router.use(protect);
 
 // User routes
 router.post("/:id/enroll", enrollInWorkoutPlan);
+router.post("/:id/rate", rateWorkoutPlan);
 router.get("/user/plans", getUserWorkoutPlans);
 router.post("/progress/:progressId/complete", logWorkoutCompletion);
 
-// Trainer routes
-router.post("/", authorize("trainer"), createWorkoutPlan);
-router.put("/:id", authorize("trainer"), updateWorkoutPlan);
-router.delete("/:id", authorize("trainer"), deleteWorkoutPlan);
+// Trainer/Admin routes
+router.post("/", authorize("trainer", "admin"), createWorkoutPlan);
+router.put("/:id", authorize("trainer", "admin"), updateWorkoutPlan);
+router.delete("/:id", authorize("trainer", "admin"), deleteWorkoutPlan);
 
 export default router;

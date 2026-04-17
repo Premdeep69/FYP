@@ -6,12 +6,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Star, Search, Calendar, DollarSign, Award, User,
-  Briefcase, CheckCircle, ArrowRight, X, Clock, Users,
+  Briefcase, CheckCircle, ArrowRight, X, Clock, Users, MessageSquarePlus,
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import RequestSessionDialog from '@/components/RequestSessionDialog';
 
 interface Trainer {
   _id: string;
@@ -33,17 +34,22 @@ interface Trainer {
 const getInitials = (name: string) =>
   name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
-const StarRating = ({ value, count }: { value: number; count: number }) => (
-  <div className="flex items-center gap-1.5">
-    <div className="flex">
-      {[1, 2, 3, 4, 5].map(s => (
-        <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-      ))}
+const StarRating = ({ value, count }: { value: number; count: number }) => {
+  if (!count || count === 0) {
+    return <span className="text-xs text-gray-400">No reviews yet</span>;
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map(s => (
+          <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+        ))}
+      </div>
+      <span className="text-sm font-medium text-gray-700">{value.toFixed(1)}</span>
+      <span className="text-xs text-gray-400">({count})</span>
     </div>
-    <span className="text-sm font-medium text-gray-700">{value.toFixed(1)}</span>
-    <span className="text-xs text-gray-400">({count})</span>
-  </div>
-);
+  );
+};
 
 const Trainers: React.FC = () => {
   const { user } = useAuth();
@@ -53,8 +59,20 @@ const Trainers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
+  const [modalReviews, setModalReviews] = useState<any[]>([]);
+  const [modalReviewsLoading, setModalReviewsLoading] = useState(false);
+  const [requestTrainer, setRequestTrainer] = useState<Trainer | null>(null);
 
   useEffect(() => { fetchTrainers(); }, []);
+
+  useEffect(() => {
+    if (!selectedTrainer) { setModalReviews([]); return; }
+    setModalReviewsLoading(true);
+    apiService.getTrainerById(selectedTrainer._id)
+      .then((data: any) => setModalReviews(data.recentReviews || []))
+      .catch(() => setModalReviews([]))
+      .finally(() => setModalReviewsLoading(false));
+  }, [selectedTrainer]);
 
   const fetchTrainers = async () => {
     try {
@@ -164,9 +182,9 @@ const Trainers: React.FC = () => {
                     {/* Stats row */}
                     <div className="grid grid-cols-3 gap-3 mb-5">
                       {[
-                        { icon: Award, label: 'Exp.', value: `${trainer.trainerProfile.experience}y` },
+                        { icon: Award, label: 'Exp.', value: trainer.trainerProfile.experience ? `${trainer.trainerProfile.experience}y` : 'N/A' },
                         { icon: Calendar, label: 'Sessions', value: trainer.trainerProfile.completedSessions || 0 },
-                        { icon: DollarSign, label: '/hour', value: `$${trainer.trainerProfile.hourlyRate}` },
+                        { icon: DollarSign, label: '/hour', value: trainer.trainerProfile.hourlyRate ? `$${trainer.trainerProfile.hourlyRate}` : 'TBD' },
                       ].map(({ icon: Icon, label, value }) => (
                         <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
                           <Icon className="w-4 h-4 text-indigo-500 mx-auto mb-1" />
@@ -206,6 +224,12 @@ const Trainers: React.FC = () => {
                         Book Now <ArrowRight className="w-3.5 h-3.5 ml-1" />
                       </Button>
                     </div>
+                    {user?.userType === 'user' && (
+                      <Button variant="ghost" size="sm" className="w-full mt-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setRequestTrainer(trainer)}>
+                        <MessageSquarePlus className="w-3.5 h-3.5 mr-1.5" /> Request a Session
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -213,6 +237,13 @@ const Trainers: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Request Session Dialog */}
+      <RequestSessionDialog
+        open={!!requestTrainer}
+        onOpenChange={o => !o && setRequestTrainer(null)}
+        trainer={requestTrainer}
+      />
 
       {/* Trainer Detail Modal */}
       <Dialog open={!!selectedTrainer} onOpenChange={o => !o && setSelectedTrainer(null)}>
@@ -241,9 +272,9 @@ const Trainers: React.FC = () => {
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-4 mt-6">
                   {[
-                    { label: 'Experience', value: `${selectedTrainer.trainerProfile.experience} yrs` },
+                    { label: 'Experience', value: selectedTrainer.trainerProfile.experience ? `${selectedTrainer.trainerProfile.experience} yrs` : 'N/A' },
                     { label: 'Sessions', value: selectedTrainer.trainerProfile.completedSessions || 0 },
-                    { label: 'Rating', value: selectedTrainer.trainerProfile.rating.average.toFixed(1) },
+                    { label: 'Rating', value: selectedTrainer.trainerProfile.rating?.count ? selectedTrainer.trainerProfile.rating.average.toFixed(1) : 'New' },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-white/10 rounded-xl p-3 text-center backdrop-blur-sm">
                       <p className="text-xl font-bold">{value}</p>
@@ -319,12 +350,63 @@ const Trainers: React.FC = () => {
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 flex items-center justify-between border border-indigo-100">
                   <div>
                     <p className="text-sm text-gray-500">Starting from</p>
-                    <p className="text-3xl font-bold text-indigo-700">${selectedTrainer.trainerProfile.hourlyRate}<span className="text-base font-normal text-gray-400">/hr</span></p>
+                    {selectedTrainer.trainerProfile.hourlyRate ? (
+                      <p className="text-3xl font-bold text-indigo-700">${selectedTrainer.trainerProfile.hourlyRate}<span className="text-base font-normal text-gray-400">/hr</span></p>
+                    ) : (
+                      <p className="text-lg font-semibold text-gray-500">Contact for pricing</p>
+                    )}
                   </div>
-                  <Button className="bg-indigo-600 hover:bg-indigo-700 px-6"
-                    onClick={() => { setSelectedTrainer(null); handleBook(selectedTrainer); }}>
-                    Book Session <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  <div className="flex flex-col gap-2 items-end">
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 px-6"
+                      onClick={() => { setSelectedTrainer(null); handleBook(selectedTrainer); }}>
+                      Book Session <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                    {user?.userType === 'user' && (
+                      <Button variant="outline" size="sm" className="text-xs"
+                        onClick={() => { setSelectedTrainer(null); setRequestTrainer(selectedTrainer); }}>
+                        <MessageSquarePlus className="w-3.5 h-3.5 mr-1.5" /> Request a Session
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Real reviews from DB */}
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" /> Client Reviews
+                  </h3>
+                  {modalReviewsLoading ? (
+                    <div className="text-sm text-gray-400 text-center py-4">Loading reviews…</div>
+                  ) : modalReviews.length === 0 ? (
+                    <div className="text-center py-6 bg-gray-50 rounded-xl border border-gray-100">
+                      <Star className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                      <p className="text-sm text-gray-400">No reviews yet</p>
+                      <p className="text-xs text-gray-300 mt-0.5">Be the first to leave a review after your session</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {modalReviews.map((review: any, i: number) => (
+                        <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-medium text-gray-800">
+                              {review.clientId?.name || 'Client'}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} className={`w-3.5 h-3.5 ${s <= review.feedback?.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+                              ))}
+                            </div>
+                          </div>
+                          {review.feedback?.comment && (
+                            <p className="text-xs text-gray-600 leading-relaxed">"{review.feedback.comment}"</p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1.5">
+                            {new Date(review.feedback?.createdAt || review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </>

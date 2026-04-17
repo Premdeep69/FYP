@@ -55,8 +55,9 @@ export const getStats = async (req, res) => {
 export const getAllUsers = async (req, res) => {
   try {
     const { page = 1, limit = 20, search, userType } = req.query;
-    const query = {};
+    const query = { isDeleted: { $ne: true } };
     if (userType) query.userType = userType;
+    else query.userType = 'user'; // default: only members, not trainers/admins
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -84,11 +85,8 @@ export const getPendingTrainers = async (req, res) => {
   try {
     const trainers = await User.find({
       userType: "trainer",
-      $or: [
-        { "trainerVerification.status": "pending" },
-        { "trainerVerification.status": { $exists: false } },
-        { trainerVerification: { $exists: false } },
-      ],
+      isDeleted: { $ne: true },
+      "trainerVerification.status": "pending",
     }).select("-password").sort({ createdAt: -1 }).lean();
 
     // Attach documents from separate collection
@@ -116,7 +114,10 @@ export const getPendingTrainers = async (req, res) => {
 // GET /api/admin/trainers
 export const getAllTrainers = async (req, res) => {
   try {
-    const trainers = await User.find({ userType: "trainer" })
+    const trainers = await User.find({
+      userType: "trainer",
+      isDeleted: { $ne: true },
+    })
       .select("-password")
       .sort({ createdAt: -1 });
 
@@ -314,6 +315,31 @@ export const addTrainer = async (req, res) => {
     res.status(201).json({
       message: "Trainer added successfully",
       trainer: { id: trainer._id, name: trainer.name, email: trainer.email },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// DELETE /api/admin/users/:id — permanently delete a user or trainer
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ message: "You cannot delete your own account." });
+    }
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Mark as deleted — preserves referential integrity for sessions/payments
+    user.isDeleted = true;
+    user.isActive = false;
+    await user.save();
+
+    res.json({
+      message: `${user.userType === "trainer" ? "Trainer" : "User"} "${user.name}" has been deleted.`,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

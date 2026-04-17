@@ -51,6 +51,10 @@ const sessionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Payment",
     },
+    slotId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SessionSlot",
+    },
     notes: String,
     clientNotes: String, // Notes from client when booking
     trainerNotes: String, // Notes from trainer
@@ -59,7 +63,14 @@ const sessionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    cancelledByRole: {
+      type: String,
+      enum: ["user", "trainer", "admin"],
+    },
     cancelledAt: Date,
+    refundPercentage: {
+      type: Number, // 0–100
+    },
     feedback: {
       rating: {
         type: Number,

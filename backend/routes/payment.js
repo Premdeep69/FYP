@@ -3,6 +3,7 @@ import {
   createSessionPayment,
   createSubscription,
   getPaymentHistory,
+  getTrainerPaymentHistory,
   getUserSubscriptions,
   cancelSubscription,
   getTrainerEarnings,
@@ -37,6 +38,7 @@ router.put("/subscriptions/:subscriptionId/cancel", cancelSubscription);
 
 // Payment history
 router.get("/history", getPaymentHistory);
+router.get("/trainer-history", authorize("trainer"), getTrainerPaymentHistory);
 
 // Payment statistics
 router.get("/statistics", getPaymentStatistics);

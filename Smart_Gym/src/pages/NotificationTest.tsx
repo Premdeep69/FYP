@@ -3,10 +3,17 @@ import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useNotificationScheduler } from "@/services/notificationScheduler";
 import { Bell, Flame, Target, CheckCircle, MessageSquare, Trophy, Award, UserCheck, Calendar, Clock } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
 
 const NotificationTest = () => {
+  const { user } = useAuth();
   const { addNotification, notifications, unreadCount, markAllAsRead, clearAll } = useNotifications();
   const { sendTestReminder } = useNotificationScheduler();
+
+  // Only accessible to authenticated users in development
+  if (!user) return <Navigate to="/login" replace />;
+  if (import.meta.env.MODE === 'production') return <Navigate to="/" replace />;
 
   const testNotifications = [
     {

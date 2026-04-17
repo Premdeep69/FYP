@@ -67,10 +67,10 @@ class BookingController {
       const recentReviews = await Session.find({
         trainerId,
         status: "completed",
-        "feedback.rating": { $exists: true },
+        "feedback.rating": { $exists: true, $gt: 0 },
       })
         .populate("clientId", "name")
-        .select("feedback createdAt")
+        .select("feedback clientId createdAt")
         .sort({ "feedback.createdAt": -1 })
         .limit(10);
 
@@ -196,6 +196,12 @@ class BookingController {
   createBooking = async (req, res) => {
     try {
       const clientId = req.user._id;
+
+      // Only users (not trainers/admins) can create bookings
+      if (req.user.userType !== 'user') {
+        return res.status(403).json({ message: "Only users can book sessions" });
+      }
+
       const { trainerId, sessionType, scheduledDate, startTime, duration, notes } = req.body;
 
       // Validate trainer
@@ -216,6 +222,8 @@ class BookingController {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
+      // Atomic conflict check + insert: use findOneAndUpdate with upsert on a
+      // lock document to prevent race conditions between concurrent requests
       const conflictingBooking = await Session.findOne({
         trainerId,
         scheduledDate: { $gte: startOfDay, $lte: endOfDay },
@@ -360,6 +368,7 @@ class BookingController {
 
       const bookings = await Session.find(query)
         .populate("trainerId", "name email trainerProfile")
+        .populate("slotId", "_id")
         .sort({ scheduledDate: -1, startTime: -1 })
         .limit(parseInt(limit))
         .skip((parseInt(page) - 1) * parseInt(limit));
@@ -500,12 +509,16 @@ class BookingController {
       const { rating, comment } = req.body;
       const userId = req.user._id;
 
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
       const booking = await Session.findById(bookingId);
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      // Only client can add feedback
+      // Only the client can add feedback
       if (booking.clientId.toString() !== userId.toString()) {
         return res.status(403).json({ message: "Not authorized" });
       }
@@ -514,27 +527,41 @@ class BookingController {
         return res.status(400).json({ message: "Can only rate completed sessions" });
       }
 
-      // Update booking feedback
-      booking.feedback = {
-        rating,
-        comment,
-        createdAt: new Date(),
-      };
+      if (booking.feedback?.rating) {
+        return res.status(400).json({ message: "You have already reviewed this session" });
+      }
+
+      // Save feedback on the booking
+      booking.feedback = { rating, comment: comment?.trim() || "", createdAt: new Date() };
       await booking.save();
 
-      // Update trainer rating
-      const trainer = await User.findById(booking.trainerId);
-      const totalRating = trainer.trainerProfile.rating.average * trainer.trainerProfile.rating.count;
-      const newCount = trainer.trainerProfile.rating.count + 1;
-      const newAverage = (totalRating + rating) / newCount;
+      // Recompute trainer rating from ALL rated completed sessions
+      const ratedSessions = await Session.find({
+        trainerId: booking.trainerId,
+        status: "completed",
+        "feedback.rating": { $exists: true, $gt: 0 },
+      }).select("feedback.rating");
 
-      trainer.trainerProfile.rating.average = newAverage;
-      trainer.trainerProfile.rating.count = newCount;
-      await trainer.save();
+      const totalCount = ratedSessions.length;
+      const totalSum = ratedSessions.reduce((s, sess) => s + (sess.feedback?.rating || 0), 0);
+      const newAverage = totalCount > 0
+        ? Math.round((totalSum / totalCount) * 10) / 10
+        : 0;
+
+      await User.findByIdAndUpdate(booking.trainerId, {
+        "trainerProfile.rating.average": newAverage,
+        "trainerProfile.rating.count": totalCount,
+      });
+
+      await booking.populate([
+        { path: "trainerId", select: "name email trainerProfile" },
+        { path: "clientId", select: "name email" },
+      ]);
 
       res.json({
         message: "Feedback added successfully",
         booking,
+        trainerRating: { average: newAverage, count: totalCount },
       });
     } catch (error) {
       console.error("Add feedback error:", error);
@@ -678,6 +705,62 @@ class BookingController {
     }
   };
 
+  // Get payment intent client secret for a pending booking
+  getBookingPaymentIntent = async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const userId = req.user._id;
+
+      const booking = await Session.findOne({ _id: bookingId, clientId: userId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      if (booking.paymentStatus === 'paid') {
+        return res.status(400).json({ message: "Booking already paid" });
+      }
+
+      // Find the payment record
+      const payment = await Payment.findOne({
+        sessionId: bookingId,
+        userId,
+        status: 'pending',
+      });
+
+      if (!payment) return res.status(404).json({ message: "Payment record not found" });
+
+      // If we have a stored clientSecret, return it
+      if (payment.stripeClientSecret) {
+        return res.json({
+          clientSecret: payment.stripeClientSecret,
+          amount: payment.amount / 100,
+          paymentIntentId: payment.stripePaymentIntentId,
+        });
+      }
+
+      // Otherwise retrieve from Stripe
+      const stripeConfigured = stripe &&
+        process.env.STRIPE_SECRET_KEY &&
+        !process.env.STRIPE_SECRET_KEY.includes('your_stripe');
+
+      if (!stripeConfigured) {
+        return res.status(503).json({ message: "Payment system not configured" });
+      }
+
+      const pi = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+      if (pi.status === 'succeeded') {
+        return res.status(400).json({ message: "Payment already completed" });
+      }
+
+      res.json({
+        clientSecret: pi.client_secret,
+        amount: payment.amount / 100,
+        paymentIntentId: pi.id,
+      });
+    } catch (error) {
+      console.error("getBookingPaymentIntent error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  };
+
   // Get booking statistics for trainer
   getBookingStats = async (req, res) => {
     try {
@@ -729,163 +812,344 @@ class BookingController {
       const userId = req.user._id;
 
       const booking = await Session.findById(bookingId);
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      // Check authorization
       if (booking.clientId.toString() !== userId.toString()) {
         return res.status(403).json({ message: "Not authorized" });
       }
 
-      // Check if Stripe is configured
-      if (!stripe) {
-        return res.status(503).json({ message: "Payment system not configured" });
-      }
-
-      // Verify payment with Stripe
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-      if (paymentIntent.status === 'succeeded') {
-        // Update booking status
-        booking.status = "confirmed";
-        booking.paymentStatus = "paid";
-        await booking.save();
-
-        // Update payment record
-        await Payment.findOneAndUpdate(
-          { stripePaymentIntentId: paymentIntentId },
-          { status: 'succeeded' }
-        );
-
+      // Idempotency: if already confirmed, return success immediately
+      if (booking.status === "confirmed" && booking.paymentStatus === "paid") {
         await booking.populate([
           { path: "trainerId", select: "name email trainerProfile" },
           { path: "clientId", select: "name email" },
         ]);
-
-        // Emit sync event
-        syncService.emit('booking:confirmed', { bookingId });
-
-        res.json({
-          message: "Payment confirmed. Booking is now confirmed!",
-          booking,
-        });
-      } else if (paymentIntent.status === 'canceled') {
-        // Cancel booking if payment was canceled
-        booking.status = "cancelled";
-        booking.paymentStatus = "failed";
-        booking.cancellationReason = "Payment was canceled";
-        booking.cancelledBy = userId;
-        booking.cancelledAt = new Date();
-        await booking.save();
-
-        await Payment.findOneAndUpdate(
-          { stripePaymentIntentId: paymentIntentId },
-          { status: 'canceled' }
-        );
-
-        // Emit sync event
-        syncService.emit('booking:cancelled', { bookingId });
-
-        res.status(400).json({
-          message: "Payment was canceled. Booking has been cancelled.",
-          booking,
-        });
-      } else {
-        res.status(400).json({
-          message: `Payment status: ${paymentIntent.status}. Please try again.`,
-          status: paymentIntent.status,
-        });
-      }
-    } catch (error) {
-      console.error("Confirm booking payment error:", error);
-      res.status(500).json({ message: error.message });
-    }
-  };
-
-  // Cancel booking with payment refund
-  cancelBookingWithRefund = async (req, res) => {
-    try {
-      const { bookingId } = req.params;
-      const { reason } = req.body;
-      const userId = req.user._id;
-
-      const booking = await Session.findById(bookingId).populate('paymentId');
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
+        return res.json({ message: "Booking already confirmed", booking, invoiceNumber: null });
       }
 
-      // Check authorization
-      const isTrainer = booking.trainerId.toString() === userId.toString();
-      const isClient = booking.clientId.toString() === userId.toString();
+      // Verify with Stripe if configured
+      const stripeConfigured = stripe &&
+        process.env.STRIPE_SECRET_KEY &&
+        !process.env.STRIPE_SECRET_KEY.includes('your_stripe');
 
-      if (!isTrainer && !isClient) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
+      if (stripeConfigured && paymentIntentId) {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-      // Check if booking can be cancelled
-      if (!['pending', 'confirmed'].includes(booking.status)) {
-        return res.status(400).json({ message: "Cannot cancel this booking" });
-      }
+        if (paymentIntent.status === 'canceled') {
+          booking.status = "cancelled";
+          booking.paymentStatus = "failed";
+          booking.cancellationReason = "Payment was canceled";
+          booking.cancelledBy = userId;
+          booking.cancelledAt = new Date();
+          await booking.save();
+          await Payment.findOneAndUpdate(
+            { stripePaymentIntentId: paymentIntentId },
+            { status: 'canceled' }
+          );
+          syncService.emit('booking:cancelled', { bookingId });
+          return res.status(400).json({ message: "Payment was canceled. Booking has been cancelled.", booking });
+        }
 
-      // Process refund if payment was made
-      if (booking.paymentStatus === 'paid' && booking.paymentId && stripe) {
-        const payment = await Payment.findById(booking.paymentId);
-        
-        if (payment && payment.stripePaymentIntentId) {
-          try {
-            // Create refund in Stripe
-            const refund = await stripe.refunds.create({
-              payment_intent: payment.stripePaymentIntentId,
-              reason: 'requested_by_customer',
-              metadata: {
-                bookingId: bookingId.toString(),
-                cancelledBy: userId.toString(),
-                reason: reason || 'Booking cancelled'
-              }
-            });
-
-            // Update payment record
-            await Payment.findByIdAndUpdate(payment._id, {
-              status: 'refunded',
-              refundId: refund.id,
-              refundedAmount: refund.amount,
-              refundedAt: new Date(),
-              refundReason: reason
-            });
-
-            booking.paymentStatus = 'refunded';
-          } catch (refundError) {
-            console.error('Refund error:', refundError);
-            // Continue with cancellation even if refund fails
-          }
+        if (paymentIntent.status !== 'succeeded') {
+          return res.status(400).json({
+            message: `Payment not completed. Status: ${paymentIntent.status}. Please try again.`,
+            status: paymentIntent.status,
+          });
         }
       }
 
-      // Update booking
-      booking.status = "cancelled";
-      booking.cancellationReason = reason;
-      booking.cancelledBy = userId;
-      booking.cancelledAt = new Date();
+      // Confirm booking
+      booking.status = "confirmed";
+      booking.paymentStatus = "paid";
       await booking.save();
+
+      // Update payment record
+      const paymentRecord = await Payment.findOneAndUpdate(
+        { stripePaymentIntentId: paymentIntentId },
+        { status: 'succeeded' },
+        { new: true }
+      ).populate('userId', 'name email').populate('trainerId', 'name');
 
       await booking.populate([
         { path: "trainerId", select: "name email trainerProfile" },
         { path: "clientId", select: "name email" },
       ]);
 
-      // Emit sync event
-      syncService.emit('booking:cancelled', { bookingId });
+      // Auto-generate invoice
+      let invoiceNumber = null;
+      if (paymentRecord && stripeConfigured) {
+        try {
+          const { generatePaymentReceipt } = await import('../services/invoiceService.js');
+          const invoice = await generatePaymentReceipt(paymentRecord);
+          invoiceNumber = invoice.filename.replace('invoice-', '').replace('.pdf', '');
+          await Payment.findByIdAndUpdate(paymentRecord._id, {
+            invoiceUrl: invoice.url,
+            invoiceNumber,
+            invoiceGeneratedAt: new Date(),
+          });
+        } catch (invoiceErr) {
+          console.error('Invoice generation error (non-fatal):', invoiceErr.message);
+        }
+      }
+
+      // Notify trainer via socket
+      syncService.emit('booking:confirmed', {
+        bookingId,
+        trainerId: booking.trainerId._id || booking.trainerId,
+        clientName: booking.clientId.name,
+        sessionDate: booking.scheduledDate,
+        sessionType: booking.sessionType,
+      });
 
       res.json({
-        message: booking.paymentStatus === 'refunded' 
-          ? "Booking cancelled and payment refunded successfully"
-          : "Booking cancelled successfully",
+        message: "Payment confirmed. Booking is now confirmed!",
         booking,
-        refunded: booking.paymentStatus === 'refunded',
+        invoiceNumber,
       });
     } catch (error) {
-      console.error("Cancel booking with refund error:", error);
+      console.error("Confirm booking payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cancel booking — called by USER (client). 70% refund if paid.
+  // ─────────────────────────────────────────────────────────────────────────
+  cancelBookingWithRefund = async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const { reason } = req.body;
+      const userId = req.user._id;
+
+      const booking = await Session.findById(bookingId)
+        .populate('paymentId')
+        .populate('trainerId', 'name email')
+        .populate('clientId', 'name email');
+
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      // Only the client can use this endpoint
+      if (booking.clientId._id.toString() !== userId.toString()) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (!['pending', 'confirmed'].includes(booking.status)) {
+        return res.status(400).json({ message: "Cannot cancel this booking" });
+      }
+
+      const REFUND_PCT = 70; // user cancellation = 70% refund
+      let refundedAmountCents = 0;
+      let stripeRefundId = null;
+      let refundProcessed = false;
+
+      // ── Process Stripe refund ──────────────────────────────────────────────
+      if (booking.paymentStatus === 'paid' && booking.paymentId && stripe) {
+        const payment = await Payment.findById(booking.paymentId);
+
+        if (payment && payment.stripePaymentIntentId) {
+          refundedAmountCents = Math.round(payment.amount * REFUND_PCT / 100);
+
+          try {
+            const refund = await stripe.refunds.create({
+              payment_intent: payment.stripePaymentIntentId,
+              amount: refundedAmountCents,
+              reason: 'requested_by_customer',
+              metadata: {
+                bookingId: bookingId.toString(),
+                cancelledBy: userId.toString(),
+                cancelledByRole: 'user',
+                refundPercentage: String(REFUND_PCT),
+                reason: reason || 'Cancelled by user',
+              },
+            });
+
+            stripeRefundId = refund.id;
+            refundProcessed = true;
+
+            await Payment.findByIdAndUpdate(payment._id, {
+              status: 'refunded',
+              refundId: refund.id,
+              refundAmount: refundedAmountCents,
+              refundPercentage: REFUND_PCT,
+              refundedAt: new Date(),
+              refundReason: reason || 'Cancelled by user',
+            });
+
+            booking.paymentStatus = 'refunded';
+          } catch (refundError) {
+            console.error('Stripe refund error (user cancel):', refundError.message);
+            // Continue with cancellation even if Stripe fails
+          }
+        }
+      }
+
+      // ── Update booking ─────────────────────────────────────────────────────
+      booking.status = 'cancelled';
+      booking.cancellationReason = reason || 'Cancelled by user';
+      booking.cancelledBy = userId;
+      booking.cancelledByRole = 'user';
+      booking.cancelledAt = new Date();
+      booking.refundPercentage = refundProcessed ? REFUND_PCT : 0;
+      await booking.save();
+
+      // ── Notify both parties ────────────────────────────────────────────────
+      const refundAmountDollars = (refundedAmountCents / 100).toFixed(2);
+      const originalAmountDollars = (booking.price).toFixed(2);
+      const retainedDollars = (booking.price - refundedAmountCents / 100).toFixed(2);
+
+      syncService.emit('booking:cancelled', {
+        bookingId,
+        cancelledByRole: 'user',
+        clientName: booking.clientId.name,
+        trainerName: booking.trainerId.name,
+        refundProcessed,
+        refundPercentage: REFUND_PCT,
+        refundAmount: refundAmountDollars,
+      });
+
+      // Socket notification to trainer
+      const trainerId = booking.trainerId._id?.toString() || booking.trainerId.toString();
+      syncService.emit('booking:cancelled_notify_trainer', {
+        trainerId,
+        message: refundProcessed
+          ? `${booking.clientId.name} cancelled their booking. A 70% refund ($${refundAmountDollars}) was issued; you retain $${retainedDollars}.`
+          : `${booking.clientId.name} cancelled their booking.`,
+      });
+
+      res.json({
+        message: refundProcessed
+          ? `Booking cancelled. A 70% refund of $${refundAmountDollars} has been processed. A 30% cancellation fee of $${retainedDollars} was retained.`
+          : 'Booking cancelled successfully.',
+        booking,
+        refund: refundProcessed ? {
+          processed: true,
+          percentage: REFUND_PCT,
+          refundAmount: refundAmountDollars,
+          cancellationFee: retainedDollars,
+          stripeRefundId,
+        } : { processed: false },
+      });
+    } catch (error) {
+      console.error('Cancel booking (user) error:', error);
+      res.status(500).json({ message: error.message });
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cancel booking — called by TRAINER. 100% full refund if paid.
+  // ─────────────────────────────────────────────────────────────────────────
+  cancelBookingAsTrainer = async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const { reason } = req.body;
+      const userId = req.user._id;
+
+      const booking = await Session.findById(bookingId)
+        .populate('paymentId')
+        .populate('trainerId', 'name email')
+        .populate('clientId', 'name email');
+
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      // Only the trainer of this booking can use this endpoint
+      if (booking.trainerId._id.toString() !== userId.toString()) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (!['pending', 'confirmed'].includes(booking.status)) {
+        return res.status(400).json({ message: "Cannot cancel this booking" });
+      }
+
+      const REFUND_PCT = 100; // trainer cancellation = full refund
+      let refundedAmountCents = 0;
+      let stripeRefundId = null;
+      let refundProcessed = false;
+
+      // ── Process Stripe full refund ─────────────────────────────────────────
+      if (booking.paymentStatus === 'paid' && booking.paymentId && stripe) {
+        const payment = await Payment.findById(booking.paymentId);
+
+        if (payment && payment.stripePaymentIntentId) {
+          refundedAmountCents = payment.amount; // 100%
+
+          try {
+            const refund = await stripe.refunds.create({
+              payment_intent: payment.stripePaymentIntentId,
+              // no `amount` = full refund
+              reason: 'requested_by_customer',
+              metadata: {
+                bookingId: bookingId.toString(),
+                cancelledBy: userId.toString(),
+                cancelledByRole: 'trainer',
+                refundPercentage: '100',
+                reason: reason || 'Cancelled by trainer',
+              },
+            });
+
+            stripeRefundId = refund.id;
+            refundProcessed = true;
+
+            await Payment.findByIdAndUpdate(payment._id, {
+              status: 'refunded',
+              refundId: refund.id,
+              refundAmount: refundedAmountCents,
+              refundPercentage: REFUND_PCT,
+              refundedAt: new Date(),
+              refundReason: reason || 'Cancelled by trainer',
+            });
+
+            booking.paymentStatus = 'refunded';
+          } catch (refundError) {
+            console.error('Stripe refund error (trainer cancel):', refundError.message);
+          }
+        }
+      }
+
+      // ── Update booking ─────────────────────────────────────────────────────
+      booking.status = 'cancelled';
+      booking.cancellationReason = reason || 'Cancelled by trainer';
+      booking.cancelledBy = userId;
+      booking.cancelledByRole = 'trainer';
+      booking.cancelledAt = new Date();
+      booking.refundPercentage = refundProcessed ? REFUND_PCT : 0;
+      await booking.save();
+
+      // ── Notify both parties ────────────────────────────────────────────────
+      const refundAmountDollars = (refundedAmountCents / 100).toFixed(2);
+
+      syncService.emit('booking:cancelled', {
+        bookingId,
+        cancelledByRole: 'trainer',
+        clientName: booking.clientId.name,
+        trainerName: booking.trainerId.name,
+        refundProcessed,
+        refundPercentage: REFUND_PCT,
+        refundAmount: refundAmountDollars,
+      });
+
+      // Socket notification to client
+      const clientId = booking.clientId._id?.toString() || booking.clientId.toString();
+      syncService.emit('booking:cancelled_notify_client', {
+        clientId,
+        message: refundProcessed
+          ? `Your trainer ${booking.trainerId.name} cancelled your session. A full refund of $${refundAmountDollars} has been issued.`
+          : `Your trainer ${booking.trainerId.name} cancelled your session.`,
+      });
+
+      res.json({
+        message: refundProcessed
+          ? `Booking cancelled. A full 100% refund of $${refundAmountDollars} has been processed for the client.`
+          : 'Booking cancelled successfully.',
+        booking,
+        refund: refundProcessed ? {
+          processed: true,
+          percentage: REFUND_PCT,
+          refundAmount: refundAmountDollars,
+          stripeRefundId,
+        } : { processed: false },
+      });
+    } catch (error) {
+      console.error('Cancel booking (trainer) error:', error);
       res.status(500).json({ message: error.message });
     }
   };

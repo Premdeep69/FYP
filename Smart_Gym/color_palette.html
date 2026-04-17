@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartGym Color Palette</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    .palette-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 760px;
+      background: #fff;
+      padding: 40px;
+    }
+
+    .palette-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 32px;
+      letter-spacing: -0.02em;
+    }
+
+    .color-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0;
+    }
+
+    .color-swatch {
+      width: 380px;
+      height: 72px;
+      flex-shrink: 0;
+    }
+
+    /* Group swatches that touch each other */
+    .group-top    { border-radius: 0; }
+    .group-middle { border-radius: 0; }
+    .group-bottom { border-radius: 0; }
+    .group-solo   { border-radius: 0; }
+
+    .color-label {
+      margin-left: 32px;
+      font-size: 15px;
+      color: #37474F;
+      font-weight: 400;
+      line-height: 1.4;
+    }
+
+    .color-label strong {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 2px;
+    }
+
+    .color-label span {
+      font-size: 13px;
+      color: #78909C;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Gap between groups */
+    .group-gap {
+      height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="palette-wrapper">
+    <div class="palette-title">SmartGym — Color Palette</div>
+
+    <!-- PRIMARY -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#3B5BF5; border-radius: 8px 8px 0 0;"></div>
+      <div class="color-label">
+        <strong>Primary — Indigo Blue</strong>
+        <span>#3B5BF5</span>
+      </div>
+    </div>
+
+    <!-- SECONDARY -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#8B3CF7; border-radius: 0 0 8px 8px;"></div>
+      <div class="color-label">
+        <strong>Secondary — Vivid Violet</strong>
+        <span>#8B3CF7</span>
+      </div>
+    </div>
+
+    <div class="group-gap"></div>
+
+    <!-- NEUTRALS -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#FFFFFF; border-radius: 8px 8px 0 0; border: 1px solid #E2E5ED; border-bottom: none;"></div>
+      <div class="color-label">
+        <strong>Neutral — White</strong>
+        <span>#FFFFFF</span>
+      </div>
+    </div>
+    <div class="color-row">
+      <div class="color-swatch" style="background:#F1F3F7;"></div>
+      <div class="color-label">
+        <strong>Neutral — Soft Grey</strong>
+        <span>#F1F3F7</span>
+      </div>
+    </div>
+    <div class="color-row">
+      <div class="color-swatch" style="background:#7A8299; border-radius: 0 0 8px 8px;"></div>
+      <div class="color-label">
+        <strong>Neutral — Muted Grey</strong>
+        <span>#7A8299</span>
+      </div>
+    </div>
+
+    <div class="group-gap"></div>
+
+    <!-- ACCENT SUCCESS -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#2EAD5C; border-radius: 8px 8px 0 0;"></div>
+      <div class="color-label">
+        <strong>Accent — Success Green</strong>
+        <span>#2EAD5C</span>
+      </div>
+    </div>
+
+    <!-- ACCENT WARNING -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#F59E0B;"></div>
+      <div class="color-label">
+        <strong>Accent — Warning Amber</strong>
+        <span>#F59E0B</span>
+      </div>
+    </div>
+
+    <!-- ACCENT ERROR -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#F03E3E; border-radius: 0 0 8px 8px;"></div>
+      <div class="color-label">
+        <strong>Accent — Error Red</strong>
+        <span>#F03E3E</span>
+      </div>
+    </div>
+
+    <div class="group-gap"></div>
+
+    <!-- INFO -->
+    <div class="color-row">
+      <div class="color-swatch" style="background:#0BBCD4; border-radius: 8px;"></div>
+      <div class="color-label">
+        <strong>Info — Cyan</strong>
+        <span>#0BBCD4</span>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

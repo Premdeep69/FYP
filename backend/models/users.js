@@ -117,6 +117,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Set by admin when account is permanently deleted
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
     // Stripe integration
     stripeCustomerId: {
       type: String,
@@ -149,6 +154,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       sparse: true,
     },
+    // Email verification
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: String,
+    emailVerificationExpires: Date,
+    // Password reset
+    passwordResetToken: String,
+    passwordResetExpires: Date,
     // Notification preferences
     preferences: {
       workoutReminders: { type: Boolean, default: true },

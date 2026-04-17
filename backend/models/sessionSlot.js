@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { randomBytes } from "crypto";
 
 const sessionSlotSchema = new mongoose.Schema(
   {
@@ -29,35 +28,9 @@ const sessionSlotSchema = new mongoose.Schema(
         return this.mode === "offline" || this.mode === "hybrid";
       },
     },
-    // Meeting configuration
-    meetingType: {
-      type: String,
-      enum: ["external", "builtin", "none"],
-      default: "none",
-      required: function() {
-        return this.mode === "online" || this.mode === "hybrid";
-      },
-    },
+    // External meeting link (Zoom, Google Meet, etc.)
     meetingLink: {
       type: String,
-      required: function() {
-        return this.meetingType === "external";
-      },
-    },
-    // Built-in video call room
-    videoCallRoom: {
-      roomId: String,
-      roomToken: String,
-      createdAt: Date,
-      expiresAt: Date,
-    },
-    // Meeting access control
-    meetingAccessControl: {
-      requiresPassword: { type: Boolean, default: false },
-      password: String, // Hashed password
-      allowEarlyJoin: { type: Boolean, default: false },
-      earlyJoinMinutes: { type: Number, default: 10 },
-      recordSession: { type: Boolean, default: false },
     },
     date: {
       type: Date,
@@ -135,7 +108,6 @@ const sessionSlotSchema = new mongoose.Schema(
 sessionSlotSchema.index({ trainerId: 1, date: 1, status: 1 });
 sessionSlotSchema.index({ status: 1, date: 1 });
 sessionSlotSchema.index({ sessionType: 1, mode: 1 });
-sessionSlotSchema.index({ "videoCallRoom.roomId": 1 });
 
 // Virtual for checking if slot is bookable
 sessionSlotSchema.virtual('isBookable').get(function() {
@@ -144,52 +116,6 @@ sessionSlotSchema.virtual('isBookable').get(function() {
          this.isActive &&
          new Date(this.date) > new Date();
 });
-
-// Method to generate built-in video call room
-sessionSlotSchema.methods.generateVideoCallRoom = function() {
-  const roomId = randomBytes(16).toString('hex');
-  const roomToken = randomBytes(32).toString('hex');
-  const expiresAt = new Date(this.date);
-  expiresAt.setHours(23, 59, 59, 999); // Expires at end of session day
-  
-  this.videoCallRoom = {
-    roomId,
-    roomToken,
-    createdAt: new Date(),
-    expiresAt,
-  };
-  
-  return { roomId, roomToken };
-};
-
-// Method to get meeting info for participant
-sessionSlotSchema.methods.getMeetingInfo = function(userId) {
-  // Check if user has booked this slot
-  const booking = this.bookedBy.find(
-    (b) => b.userId.toString() === userId.toString() && b.hasAccess
-  );
-  
-  if (!booking && this.trainerId.toString() !== userId.toString()) {
-    return null; // User doesn't have access
-  }
-  
-  if (this.meetingType === 'external') {
-    return {
-      type: 'external',
-      link: this.meetingLink,
-      password: this.meetingAccessControl.password,
-    };
-  } else if (this.meetingType === 'builtin') {
-    return {
-      type: 'builtin',
-      roomId: this.videoCallRoom.roomId,
-      roomToken: this.videoCallRoom.roomToken,
-      expiresAt: this.videoCallRoom.expiresAt,
-    };
-  }
-  
-  return null;
-};
 
 // Method to check availability
 sessionSlotSchema.methods.hasAvailability = function() {

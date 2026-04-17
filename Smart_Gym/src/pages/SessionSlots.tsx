@@ -36,7 +36,6 @@ import {
   Edit,
   Trash2,
   Copy,
-  Video,
   MapPin,
   X,
 } from 'lucide-react';
@@ -60,7 +59,6 @@ const MODES = [
 const MEETING_TYPES = [
   { value: 'none', label: 'No Meeting Link' },
   { value: 'external', label: 'External Link (Zoom, Google Meet, etc.)' },
-  { value: 'builtin', label: 'Built-in Video Call' },
 ];
 
 interface SessionSlot {
@@ -72,10 +70,6 @@ interface SessionSlot {
   location?: string;
   meetingType?: string;
   meetingLink?: string;
-  videoCallRoom?: {
-    roomId: string;
-    roomToken: string;
-  };
   date: string;
   startTime: string;
   endTime: string;
@@ -367,16 +361,11 @@ const SessionSlots: React.FC = () => {
   const getModeIcon = (mode: string) => {
     switch (mode) {
       case 'online':
-        return <Video className="w-4 h-4" />;
+        return <MapPin className="w-4 h-4" />;
       case 'offline':
         return <MapPin className="w-4 h-4" />;
       case 'hybrid':
-        return (
-          <>
-            <Video className="w-4 h-4" />
-            <MapPin className="w-4 h-4" />
-          </>
-        );
+        return <MapPin className="w-4 h-4" />;
       default:
         return null;
     }
@@ -663,7 +652,6 @@ const SessionSlots: React.FC = () => {
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
                       {formData.meetingType === 'external' && 'Provide your own Zoom, Google Meet, or other meeting link'}
-                      {formData.meetingType === 'builtin' && 'System will automatically generate a secure video call room'}
                       {formData.meetingType === 'none' && 'No online meeting link will be provided'}
                     </p>
                   </div>
@@ -680,61 +668,6 @@ const SessionSlots: React.FC = () => {
                       <p className="text-xs text-muted-foreground mt-1">
                         This link will only be shared with booked participants
                       </p>
-                    </div>
-                  )}
-
-                  {formData.meetingType === 'builtin' && (
-                    <div className="p-4 bg-muted rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <Video className="w-5 h-5 text-primary mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium">Built-in Video Call</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            A secure video call room will be automatically generated for this session.
-                            Participants will get access to the room link after booking.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {formData.meetingType === 'builtin' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="allowEarlyJoin">Allow Early Join</Label>
-                        <input
-                          type="checkbox"
-                          id="allowEarlyJoin"
-                          checked={formData.meetingAccessControl.allowEarlyJoin}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            meetingAccessControl: {
-                              ...formData.meetingAccessControl,
-                              allowEarlyJoin: e.target.checked,
-                            },
-                          })}
-                          className="rounded"
-                        />
-                      </div>
-                      {formData.meetingAccessControl.allowEarlyJoin && (
-                        <div>
-                          <Label htmlFor="earlyJoinMinutes">Early Join Time (minutes)</Label>
-                          <Input
-                            id="earlyJoinMinutes"
-                            type="number"
-                            min="5"
-                            max="30"
-                            value={formData.meetingAccessControl.earlyJoinMinutes}
-                            onChange={(e) => setFormData({
-                              ...formData,
-                              meetingAccessControl: {
-                                ...formData.meetingAccessControl,
-                                earlyJoinMinutes: parseInt(e.target.value),
-                              },
-                            })}
-                          />
-                        </div>
-                      )}
                     </div>
                   )}
                 </>

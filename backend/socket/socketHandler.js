@@ -3,6 +3,7 @@ import User from "../models/users.js";
 import Message from "../models/message.js";
 import Conversation from "../models/conversation.js";
 import notificationService from "../services/notificationService.js";
+import syncService from "../services/syncService.js";
 
 // Store active users and their socket connections
 const activeUsers = new Map();
@@ -23,6 +24,10 @@ const authenticateSocket = async (socket, next) => {
       return next(new Error("Authentication error: User not found"));
     }
 
+    if (user.isDeleted) {
+      return next(new Error("Authentication error: Account has been deleted"));
+    }
+
     socket.userId = user._id.toString();
     socket.user = user;
     next();
@@ -35,6 +40,65 @@ const authenticateSocket = async (socket, next) => {
 const handleConnection = (io) => {
   // Apply authentication middleware
   io.use(authenticateSocket);
+
+  // Bridge syncService slot events → Socket.IO broadcast
+  syncService.on('slot:created',   (data) => io.emit('slot:created',   data));
+  syncService.on('slot:updated',   (data) => io.emit('slot:updated',   data));
+  syncService.on('slot:cancelled', (data) => io.emit('slot:cancelled', data));
+  syncService.on('slot:deleted',   (data) => io.emit('slot:deleted',   data));
+
+  // Bridge session request events — route to specific users
+  syncService.on('sessionRequest:created', ({ request }) => {
+    io.to(request.trainerId._id?.toString() || request.trainerId?.toString()).emit('sessionRequest:new', { request });
+  });
+  syncService.on('sessionRequest:awaiting_payment', ({ request, clientSecret, sessionPrice }) => {
+    // Notify the user that trainer accepted and payment is needed
+    io.to(request.userId._id?.toString() || request.userId?.toString()).emit('sessionRequest:awaiting_payment', { request, clientSecret, sessionPrice });
+  });
+  syncService.on('sessionRequest:accepted', ({ request, slot }) => {
+    io.to(request.userId._id?.toString() || request.userId?.toString()).emit('sessionRequest:accepted', { request, slot });
+  });
+  syncService.on('sessionRequest:confirmed', ({ request, slot, booking }) => {
+    // Notify both trainer and user
+    const userId = request.userId._id?.toString() || request.userId?.toString();
+    const trainerId = request.trainerId._id?.toString() || request.trainerId?.toString();
+    io.to(userId).emit('sessionRequest:confirmed', { request, slot, booking });
+    io.to(trainerId).emit('sessionRequest:confirmed', { request, slot, booking });
+  });
+  syncService.on('sessionRequest:rejected', ({ request }) => {
+    io.to(request.userId._id?.toString() || request.userId?.toString()).emit('sessionRequest:rejected', { request });
+  });
+  syncService.on('sessionRequest:expired', ({ request }) => {
+    const userId = request.userId._id?.toString() || request.userId?.toString();
+    const trainerId = request.trainerId._id?.toString() || request.trainerId?.toString();
+    io.to(userId).emit('sessionRequest:expired', { request });
+    io.to(trainerId).emit('sessionRequest:expired', { request });
+  });
+  syncService.on('sessionRequest:payment_failed', ({ request }) => {
+    io.to(request.userId._id?.toString() || request.userId?.toString()).emit('sessionRequest:payment_failed', { request });
+  });
+
+  // Slot booking confirmed after payment — notify trainer
+  syncService.on('booking:confirmed', (data) => {
+    const trainerId = data.trainerId?.toString?.() || data.trainerId;
+    if (trainerId) {
+      io.to(trainerId).emit('booking:new_confirmed', data);
+    }
+  });
+
+  // Booking cancelled by user — notify trainer
+  syncService.on('booking:cancelled_notify_trainer', ({ trainerId, message }) => {
+    if (trainerId) {
+      io.to(trainerId).emit('booking:cancelled_by_user', { message });
+    }
+  });
+
+  // Booking cancelled by trainer — notify client
+  syncService.on('booking:cancelled_notify_client', ({ clientId, message }) => {
+    if (clientId) {
+      io.to(clientId).emit('booking:cancelled_by_trainer', { message });
+    }
+  });
 
   io.on("connection", (socket) => {
     console.log(`User ${socket.user.name} connected with socket ID: ${socket.id}`);
@@ -103,21 +167,23 @@ const handleConnection = (io) => {
         await Conversation.findOneAndUpdate(
           { conversationId },
           {
-            conversationId,
-            $addToSet: {
-              participants: [
-                { userId: socket.userId },
-                { userId: receiverId }
-              ]
+            $set: {
+              conversationId,
+              lastMessage: {
+                content,
+                senderId: socket.userId,
+                timestamp: new Date(),
+              },
+              conversationType: "direct",
             },
-            lastMessage: {
-              content,
-              senderId: socket.userId,
-              timestamp: new Date(),
-            },
-            conversationType: "direct",
+            $addToSet: { participants: { userId: socket.userId } },
           },
           { upsert: true, new: true }
+        );
+        // Ensure receiver is also in participants
+        await Conversation.findOneAndUpdate(
+          { conversationId },
+          { $addToSet: { participants: { userId: receiverId } } }
         );
 
         // Emit message to conversation participants

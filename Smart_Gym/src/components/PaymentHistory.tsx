@@ -1,22 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Download,
-  CreditCard,
-  Calendar,
-  DollarSign,
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  ChevronLeft, ChevronRight, Download, CreditCard, Calendar,
+  DollarSign, FileText, Loader2, Search, RefreshCw, TrendingDown,
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
@@ -29,235 +20,267 @@ interface Payment {
   paymentType: string;
   description: string;
   createdAt: string;
-  trainerId?: {
-    name: string;
-    email: string;
-  };
-  sessionId?: {
-    scheduledDate: string;
-    duration: number;
-  };
+  stripePaymentIntentId: string;
+  invoiceNumber?: string;
+  refundAmount?: number;
+  refundedAt?: string;
+  refundReason?: string;
+  trainerId?: { name: string; email: string };
+  sessionId?: { scheduledDate: string; startTime?: string; duration: number; sessionType?: string };
 }
 
-interface PaymentHistoryData {
-  payments: Payment[];
-  totalPages: number;
-  currentPage: number;
-  total: number;
-}
+const STATUS_COLORS: Record<string, string> = {
+  succeeded: 'bg-green-100 text-green-800',
+  pending:   'bg-yellow-100 text-yellow-800',
+  failed:    'bg-red-100 text-red-800',
+  canceled:  'bg-gray-100 text-gray-800',
+  refunded:  'bg-blue-100 text-blue-800',
+};
+
+const fmt = (cents: number, currency = 'usd') =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+const fmtDateTime = (d: string) =>
+  new Date(d).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const PaymentHistory: React.FC = () => {
   const { toast } = useToast();
-  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryData | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Debounce search
   useEffect(() => {
-    fetchPaymentHistory(currentPage);
-  }, [currentPage]);
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const fetchPaymentHistory = async (page: number) => {
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await apiService.getPaymentHistory(page, 10);
-      setPaymentHistory(data);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to load payment history',
-        variant: 'destructive',
-      });
+      const data: any = await apiService.getPaymentHistory(page, 10);
+      // Client-side filter by status and search since backend doesn't support it yet
+      let list: Payment[] = data.payments || [];
+      if (statusFilter !== 'all') list = list.filter(p => p.status === statusFilter);
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        list = list.filter(p =>
+          p.description?.toLowerCase().includes(q) ||
+          p.trainerId?.name?.toLowerCase().includes(q) ||
+          p.stripePaymentIntentId?.toLowerCase().includes(q)
+        );
+      }
+      setPayments(list);
+      setTotal(data.total ?? list.length);
+      setTotalPages(data.totalPages ?? 1);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, statusFilter, debouncedSearch]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'succeeded':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'canceled':
-        return 'bg-gray-100 text-gray-800';
-      case 'refunded':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+  const handleDownload = async (payment: Payment) => {
+    setDownloadingId(payment._id);
+    try {
+      let invoiceNum = payment.invoiceNumber;
+      if (!invoiceNum) {
+        const res: any = await apiService.generateInvoice(payment._id);
+        invoiceNum = res.invoiceNumber;
+      }
+      if (!invoiceNum) throw new Error('Invoice not available');
+      const blob = await apiService.downloadInvoice(`invoice-${invoiceNum}.pdf`) as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${invoiceNum}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast({ title: 'Could not download receipt', description: e.message, variant: 'destructive' });
+    } finally {
+      setDownloadingId(null);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatAmount = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(amount / 100);
-  };
-
-  if (loading && !paymentHistory) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading payment history...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!paymentHistory || paymentHistory.payments.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Payment History</h3>
-        <p className="text-muted-foreground">
-          You haven't made any payments yet. Book a session or subscribe to a plan to get started.
-        </p>
-      </Card>
-    );
-  }
+  // Summary stats
+  const succeeded = payments.filter(p => p.status === 'succeeded');
+  const refunded  = payments.filter(p => p.status === 'refunded');
+  const totalSpent = succeeded.reduce((s, p) => s + p.amount, 0);
+  const totalRefunded = refunded.reduce((s, p) => s + (p.refundAmount ?? p.amount), 0);
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-green-600" />
-            <div>
-              <p className="text-sm text-muted-foreground">Total Spent</p>
-              <p className="text-2xl font-bold">
-                {formatAmount(
-                  paymentHistory.payments
-                    .filter(p => p.status === 'succeeded')
-                    .reduce((sum, p) => sum + p.amount, 0),
-                  'usd'
-                )}
-              </p>
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Spent',       value: fmt(totalSpent),          icon: <DollarSign className="w-7 h-7 text-green-600" /> },
+          { label: 'Sessions Booked',   value: succeeded.filter(p => p.paymentType === 'session').length, icon: <Calendar className="w-7 h-7 text-blue-600" /> },
+          { label: 'Total Refunded',    value: fmt(totalRefunded),        icon: <TrendingDown className="w-7 h-7 text-orange-500" /> },
+          { label: 'Transactions',      value: total,                     icon: <CreditCard className="w-7 h-7 text-purple-600" /> },
+        ].map(({ label, value, icon }) => (
+          <Card key={label} className="p-4">
+            <div className="flex items-center gap-3">
+              {icon}
+              <div>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-xl font-bold">{value}</p>
+              </div>
             </div>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-8 h-8 text-blue-600" />
-            <div>
-              <p className="text-sm text-muted-foreground">Sessions Booked</p>
-              <p className="text-2xl font-bold">
-                {paymentHistory.payments.filter(p => p.paymentType === 'session').length}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-8 h-8 text-purple-600" />
-            <div>
-              <p className="text-sm text-muted-foreground">Total Transactions</p>
-              <p className="text-2xl font-bold">{paymentHistory.total}</p>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        ))}
       </div>
 
-      {/* Payment History Table */}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by trainer, description or transaction ID…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            {['succeeded','pending','failed','canceled','refunded'].map(s => (
+              <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" onClick={fetchHistory}>
+          <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+        </Button>
+      </div>
+
+      {/* Table */}
       <Card>
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Payment History</h3>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-          </div>
+        <div className="p-4 border-b flex items-center justify-between">
+          <h3 className="font-semibold">Payment History</h3>
+          <span className="text-sm text-muted-foreground">{total} record{total !== 1 ? 's' : ''}</span>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paymentHistory.payments.map((payment) => (
-              <TableRow key={payment._id}>
-                <TableCell>
-                  {formatDate(payment.createdAt)}
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{payment.description}</p>
-                    {payment.trainerId && (
-                      <p className="text-sm text-muted-foreground">
-                        with {payment.trainerId.name}
-                      </p>
-                    )}
-                    {payment.sessionId && (
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(payment.sessionId.scheduledDate)} • {payment.sessionId.duration} min
-                      </p>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="capitalize">
-                    {payment.paymentType}
-                  </Badge>
-                </TableCell>
-                <TableCell className="font-medium">
-                  {formatAmount(payment.amount, payment.currency)}
-                </TableCell>
-                <TableCell>
-                  <Badge className={getStatusColor(payment.status)}>
-                    {payment.status}
-                  </Badge>
-                </TableCell>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading…
+          </div>
+        ) : payments.length === 0 ? (
+          <div className="py-16 text-center text-muted-foreground">
+            <CreditCard className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No payments found</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Payment Date</TableHead>
+                <TableHead>Trainer</TableHead>
+                <TableHead>Session Details</TableHead>
+                <TableHead>Transaction ID</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Refund</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-center">Receipt</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {payments.map(p => (
+                <TableRow key={p._id}>
+                  <TableCell className="text-sm whitespace-nowrap">{fmtDateTime(p.createdAt)}</TableCell>
+
+                  <TableCell>
+                    {p.trainerId ? (
+                      <div>
+                        <p className="font-medium text-sm">{p.trainerId.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.trainerId.email}</p>
+                      </div>
+                    ) : <span className="text-muted-foreground text-sm">—</span>}
+                  </TableCell>
+
+                  <TableCell>
+                    <div>
+                      <p className="text-sm font-medium">{p.description}</p>
+                      {p.sessionId && (
+                        <p className="text-xs text-muted-foreground">
+                          {fmtDate(p.sessionId.scheduledDate)}
+                          {p.sessionId.startTime && ` · ${p.sessionId.startTime}`}
+                          {` · ${p.sessionId.duration} min`}
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs font-mono text-muted-foreground truncate max-w-[120px] block" title={p.stripePaymentIntentId}>
+                      {p.stripePaymentIntentId?.slice(0, 20)}…
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="font-semibold whitespace-nowrap">
+                    {fmt(p.amount, p.currency)}
+                  </TableCell>
+
+                  <TableCell>
+                    {p.refundAmount ? (
+                      <div>
+                        <p className="text-sm font-medium text-orange-600">-{fmt(p.refundAmount, p.currency)}</p>
+                        {p.refundedAt && <p className="text-xs text-muted-foreground">{fmtDate(p.refundedAt)}</p>}
+                        {p.refundReason && <p className="text-xs text-muted-foreground">{p.refundReason}</p>}
+                      </div>
+                    ) : <span className="text-muted-foreground text-sm">—</span>}
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge className={STATUS_COLORS[p.status] ?? 'bg-gray-100 text-gray-800'}>
+                      {p.status}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    {p.status === 'succeeded' ? (
+                      <Button
+                        variant="ghost" size="sm"
+                        className="h-7 w-7 p-0"
+                        disabled={downloadingId === p._id}
+                        onClick={() => handleDownload(p)}
+                        title="Download receipt"
+                      >
+                        {downloadingId === p._id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <FileText className="w-3.5 h-3.5 text-indigo-600" />}
+                      </Button>
+                    ) : <span className="text-muted-foreground text-xs">—</span>}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
 
         {/* Pagination */}
-        {paymentHistory.totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="p-4 border-t flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Page {paymentHistory.currentPage} of {paymentHistory.totalPages}
-            </p>
+            <p className="text-sm text-muted-foreground">Page {page} of {totalPages}</p>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={paymentHistory.currentPage === 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                <ChevronLeft className="w-4 h-4" /> Previous
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(paymentHistory.totalPages, prev + 1))}
-                disabled={paymentHistory.currentPage === paymentHistory.totalPages}
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                Next <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>

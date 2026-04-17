@@ -3,10 +3,8 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import app from "./app.js";
 import { handleConnection } from "./socket/socketHandler.js";
-
-if (process.env.NODE_ENV !== "production") {
-  import('dotenv').then(dotenv => dotenv.config());
-}
+import { startExpiryJob } from "./jobs/expireSessionRequests.js";
+import { initializeSchedulers } from "./jobs/notificationScheduler.js";
 
 const PORT = process.env.PORT;
 
@@ -30,4 +28,6 @@ server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`API available at http://localhost:${PORT}`);
   console.log(`WebSocket server ready for connections`);
+  startExpiryJob();
+  initializeSchedulers();
 });

@@ -1,152 +1,179 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, User, LogOut, LayoutDashboard, Dumbbell, ChevronDown } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import NotificationCenter from "./NotificationCenter";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Navbar = () => {
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { user, logout } = useAuth();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const navLinks = [
     { name: "Home", path: "/" },
     { name: "Exercises", path: "/exercises" },
     { name: "Workout Plans", path: "/workout-plans" },
-    ...(user && user.userType === "user" ? [
-      { name: "My Workouts", path: "/my-workouts" },
-      { name: "My Bookings", path: "/my-bookings" }
-    ] : []),
-    ...(user && user.userType === "trainer" ? [
-      { name: "Manage Bookings", path: "/trainer-management" },
-      { name: "Session Slots", path: "/session-slots" }
-    ] : []),
+    ...(user ? [{ name: "My Workouts", path: "/my-workouts" }] : []),
     { name: "Trainers", path: "/trainers" },
+    ...(user?.userType === "user" ? [
+      { name: "Browse Sessions", path: "/browse-slots" },
+      { name: "My Bookings", path: "/my-bookings" },
+      { name: "My Requests", path: "/my-requests" },
+    ] : []),
+    ...(user?.userType === "trainer" ? [
+      { name: "Session Slots", path: "/session-slots" },
+    ] : []),
     { name: "Chat", path: "/chat" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  const dashboardPath = user?.userType === 'trainer' ? '/trainer-dashboard' : user?.userType === 'admin' ? '/admin' : '/user-dashboard';
 
   return (
-    <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+    <header className={`sticky top-0 z-50 transition-all duration-200 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-border/60' : 'bg-white border-b border-border/40'}`}>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Desktop Navigation - moved to left */}
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${isActive(link.path) ? "text-primary" : "text-muted-foreground"
-                  }`}
-              >
+
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
+            <div className="w-8 h-8 rounded-lg hero-gradient flex items-center justify-center shadow-brand/30 shadow-sm group-hover:shadow-md transition-shadow">
+              <Dumbbell className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-heading font-bold text-lg tracking-tight text-foreground">
+              Smart<span className="text-primary">Gym</span>
+            </span>
+          </Link>
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map(link => (
+              <Link key={link.path} to={link.path}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive(link.path)
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}>
                 {link.name}
               </Link>
             ))}
-          </div>
+          </nav>
 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Desktop actions */}
+          <div className="hidden md:flex items-center gap-2">
             {user && <NotificationCenter />}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    {user.name}
-                  </Button>
+                  <button className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                    <Avatar className="w-7 h-7">
+                      <AvatarImage src={(user as any)?.trainerProfile?.profileImage || (user as any)?.profile?.avatar} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-foreground max-w-[120px] truncate">{user.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5 mb-1">
+                    <p className="text-xs font-medium text-foreground truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link to={user.userType === 'trainer' ? '/trainer-dashboard' : '/user-dashboard'}>
-                      Dashboard
+                    <Link to={dashboardPath} className="flex items-center gap-2">
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={logout}>
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                    <LogOut className="w-4 h-4 mr-2" /> Sign out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <>
+              <div className="flex items-center gap-2">
                 <Link to="/login">
-                  <Button variant="ghost">Login</Button>
+                  <Button variant="ghost" size="sm" className="font-medium">Sign in</Button>
                 </Link>
                 <Link to="/register">
-                  <Button>Get Started</Button>
+                  <Button size="sm" className="font-medium shadow-sm">Get Started</Button>
                 </Link>
-              </>
+              </div>
             )}
           </div>
 
-          {/* Mobile Menu Button - moved to left on mobile */}
-          <button
-            className="md:hidden"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Mobile toggle */}
+          <div className="flex md:hidden items-center gap-2">
+            {user && <NotificationCenter />}
+            <button onClick={() => setMobileOpen(!mobileOpen)}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Toggle menu">
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-border">
-            <div className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${isActive(link.path) ? "text-primary" : "text-muted-foreground"
-                    }`}
-                >
+        {/* Mobile menu */}
+        {mobileOpen && (
+          <div className="md:hidden border-t border-border/60 py-3 animate-fade-in">
+            <nav className="flex flex-col gap-0.5 mb-3">
+              {navLinks.map(link => (
+                <Link key={link.path} to={link.path}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive(link.path)
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}>
                   {link.name}
                 </Link>
               ))}
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                {user ? (
-                  <>
-                    <div className="flex justify-center pb-2">
-                      <NotificationCenter />
-                    </div>
-                    <Link to={user.userType === 'trainer' ? '/trainer-dashboard' : '/user-dashboard'} onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full justify-start">
-                        <User className="w-4 h-4 mr-2" />
-                        Dashboard
-                      </Button>
-                    </Link>
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => { logout(); setMobileMenuOpen(false); }}>
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Logout
+            </nav>
+            <div className="border-t border-border/60 pt-3 flex flex-col gap-2">
+              {user ? (
+                <>
+                  <div className="flex items-center gap-2.5 px-3 py-2">
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div><p className="text-sm font-medium">{user.name}</p><p className="text-xs text-muted-foreground capitalize">{user.userType}</p></div>
+                  </div>
+                  <Link to={dashboardPath}>
+                    <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
                     </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="ghost" className="w-full">
-                        Login
-                      </Button>
-                    </Link>
-                    <Link to="/register" onClick={() => setMobileMenuOpen(false)}>
-                      <Button className="w-full">Get Started</Button>
-                    </Link>
-                  </>
-                )}
-              </div>
+                  </Link>
+                  <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={logout}>
+                    <LogOut className="w-4 h-4" /> Sign out
+                  </Button>
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <Link to="/login" className="flex-1"><Button variant="outline" size="sm" className="w-full">Sign in</Button></Link>
+                  <Link to="/register" className="flex-1"><Button size="sm" className="w-full">Get Started</Button></Link>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
-    </nav>
+    </header>
   );
 };
 

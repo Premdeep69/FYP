@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -41,17 +41,22 @@ const getInitials = (name: string) =>
 const formatType = (type: string) =>
   type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-const StarRating = ({ value, count }: { value: number; count: number }) => (
-  <div className="flex items-center gap-1.5">
-    <div className="flex">
-      {[1,2,3,4,5].map(s => (
-        <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
-      ))}
+const StarRating = ({ value, count }: { value: number; count: number }) => {
+  if (!count || count === 0) {
+    return <span className="text-sm text-white/60">No reviews yet</span>;
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex">
+        {[1,2,3,4,5].map(s => (
+          <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+        ))}
+      </div>
+      <span className="text-sm font-semibold text-gray-700">{value.toFixed(1)}</span>
+      <span className="text-xs text-gray-400">({count} reviews)</span>
     </div>
-    <span className="text-sm font-semibold text-gray-700">{value.toFixed(1)}</span>
-    <span className="text-xs text-gray-400">({count} reviews)</span>
-  </div>
-);
+  );
+};
 
 const BookTrainerNew: React.FC = () => {
   const { trainerId } = useParams<{ trainerId: string }>();
@@ -60,6 +65,8 @@ const BookTrainerNew: React.FC = () => {
   const navigate = useNavigate();
 
   const [trainer, setTrainer] = useState<any>(null);
+  const [recentReviews, setRecentReviews] = useState<any[]>([]);
+  const [completedSessions, setCompletedSessions] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedSessionType, setSelectedSessionType] = useState('all');
@@ -81,8 +88,10 @@ const BookTrainerNew: React.FC = () => {
 
   const fetchTrainerDetails = async () => {
     try {
-      const data = await apiService.getTrainerById(trainerId!);
+      const data: any = await apiService.getTrainerById(trainerId!);
       setTrainer(data.trainer);
+      setRecentReviews(data.recentReviews || []);
+      setCompletedSessions(data.completedSessions || 0);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
       navigate('/trainers');
@@ -171,19 +180,25 @@ const BookTrainerNew: React.FC = () => {
                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5" /> Available
                 </Badge>
               </div>
-              <StarRating value={tp.rating.average} count={tp.rating.count} />
+              <StarRating value={tp.rating?.average ?? 0} count={tp.rating?.count ?? 0} />
               {tp.bio && <p className="text-white/70 text-sm mt-2 max-w-xl">{tp.bio}</p>}
 
               <div className="flex flex-wrap gap-4 mt-4">
-                {[
-                  { icon: Award, label: `${tp.experience} yrs experience` },
-                  { icon: CalendarDays, label: `${tp.completedSessions || 0} sessions` },
-                  { icon: DollarSign, label: `$${tp.hourlyRate}/hour` },
-                ].map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-1.5 text-white/80 text-sm">
-                    <Icon className="w-4 h-4 text-white/60" /> {label}
+                {tp.experience > 0 && (
+                  <div className="flex items-center gap-1.5 text-white/80 text-sm">
+                    <Award className="w-4 h-4 text-white/60" /> {tp.experience} yrs experience
                   </div>
-                ))}
+                )}
+                {(tp.completedSessions ?? 0) > 0 && (
+                  <div className="flex items-center gap-1.5 text-white/80 text-sm">
+                    <CalendarDays className="w-4 h-4 text-white/60" /> {tp.completedSessions} sessions
+                  </div>
+                )}
+                {tp.hourlyRate > 0 && (
+                  <div className="flex items-center gap-1.5 text-white/80 text-sm">
+                    <DollarSign className="w-4 h-4 text-white/60" /> ${tp.hourlyRate}/hour
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -249,7 +264,7 @@ const BookTrainerNew: React.FC = () => {
                   {[
                     { label: 'Session', value: selectedSlot.title },
                     { label: 'Date', value: selectedDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
-                    { label: 'Time', value: `${selectedSlot.startTime} – ${selectedSlot.endTime}` },
+                    { label: 'Time', value: `${selectedSlot.startTime} â€“ ${selectedSlot.endTime}` },
                     { label: 'Duration', value: `${selectedSlot.duration} min` },
                     { label: 'Mode', value: selectedSlot.mode.charAt(0).toUpperCase() + selectedSlot.mode.slice(1) },
                   ].map(({ label, value }) => (
@@ -263,6 +278,47 @@ const BookTrainerNew: React.FC = () => {
                     <span className="text-2xl font-bold">${selectedSlot.price}</span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Real reviews from DB */}
+            {recentReviews.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  Client Reviews ({recentReviews.length})
+                </h3>
+                <div className="space-y-3">
+                  {recentReviews.map((review: any, i: number) => (
+                    <div key={i} className="border-b border-gray-50 last:border-0 pb-3 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-800">
+                          {review.clientId?.name || 'Client'}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} className={`w-3 h-3 ${s <= review.feedback?.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+                          ))}
+                        </div>
+                      </div>
+                      {review.feedback?.comment && (
+                        <p className="text-xs text-gray-500 leading-relaxed">"{review.feedback.comment}"</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(review.feedback?.createdAt || review.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No reviews yet */}
+            {recentReviews.length === 0 && completedSessions > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
+                <Star className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No reviews yet</p>
+                <p className="text-xs text-gray-300 mt-0.5">{completedSessions} session{completedSessions !== 1 ? 's' : ''} completed</p>
               </div>
             )}
           </div>
@@ -355,7 +411,7 @@ const BookTrainerNew: React.FC = () => {
                               <div className="flex flex-wrap gap-3 text-sm text-gray-600">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5 text-gray-400" />
-                                  {slot.startTime} – {slot.endTime}
+                                  {slot.startTime} â€“ {slot.endTime}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Users className="w-3.5 h-3.5 text-gray-400" />
@@ -418,7 +474,7 @@ const BookTrainerNew: React.FC = () => {
                 {booking ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" /> Processing...</>
                 ) : selectedSlot ? (
-                  <>Confirm Booking · ${selectedSlot.price} <ChevronRight className="w-4 h-4 ml-1" /></>
+                  <>Confirm Booking Â· ${selectedSlot.price} <ChevronRight className="w-4 h-4 ml-1" /></>
                 ) : (
                   'Select a slot to continue'
                 )}
@@ -432,3 +488,5 @@ const BookTrainerNew: React.FC = () => {
 };
 
 export default BookTrainerNew;
+
+

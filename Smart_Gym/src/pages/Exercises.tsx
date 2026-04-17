@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Search, Filter, Star, Video } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExternalLink, Search, Filter, Star, Video, Heart } from "lucide-react";
 import { apiService } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,20 +51,34 @@ const Exercises = () => {
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("");
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string>("");
   const [sortBy, setSortBy] = useState("popularity");
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [favLoading, setFavLoading] = useState<Set<string>>(new Set());
+  const [favoriteExercises, setFavoriteExercises] = useState<Exercise[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Debounce: wait 400ms after user stops typing before searching
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchFilters();
     fetchExercises();
+    if (user) fetchFavorites();
   }, []);
 
   useEffect(() => {
     fetchExercises();
-  }, [searchTerm, selectedCategory, selectedDifficulty, sortBy]);
+  }, [debouncedSearch, selectedCategory, selectedDifficulty, selectedMuscleGroup, sortBy]);
 
   const fetchFilters = async () => {
     try {
@@ -74,22 +89,103 @@ const Exercises = () => {
     }
   };
 
+  const fetchFavorites = async () => {
+    try {
+      const data = await apiService.getFavoriteExercises();
+      const list = data as Exercise[];
+      setFavoriteExercises(list);
+      setFavoriteIds(new Set(list.map((e) => e._id)));
+    } catch (error) {
+      console.error("Failed to fetch favorites:", error);
+    }
+  };
+
+  const toggleFavorite = async (e: React.MouseEvent, exerciseId: string) => {
+    e.stopPropagation(); // prevent opening the detail dialog
+
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please log in to save favourite exercises.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (favLoading.has(exerciseId)) return;
+
+    setFavLoading((prev) => new Set(prev).add(exerciseId));
+
+    try {
+      const isFav = favoriteIds.has(exerciseId);
+      if (isFav) {
+        await apiService.removeFromFavorites(exerciseId);
+        setFavoriteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(exerciseId);
+          return next;
+        });
+        setFavoriteExercises((prev) => prev.filter((e) => e._id !== exerciseId));
+        toast({ title: "Removed from favourites" });
+      } else {
+        await apiService.addToFavorites(exerciseId);
+        setFavoriteIds((prev) => new Set(prev).add(exerciseId));
+        // find the exercise object from the current list and add it
+        const found =
+          exercises.find((e) => e._id === exerciseId) ||
+          selectedExercise?._id === exerciseId ? selectedExercise : null;
+        if (found) setFavoriteExercises((prev) => [...prev, found]);
+        toast({ title: "Added to favourites" });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Could not update favourites.",
+        variant: "destructive",
+      });
+    } finally {
+      setFavLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(exerciseId);
+        return next;
+      });
+    }
+  };
+
   const fetchExercises = async () => {
     try {
       setLoading(true);
+
+      // If there's a debounced search term, use the search endpoint
+      if (debouncedSearch.trim()) {
+        const response = await apiService.searchExercises(debouncedSearch.trim());
+        let results: Exercise[] = response.results || response.exercises || [];
+        if (selectedCategory) {
+          results = results.filter((e) => e.category === selectedCategory);
+        }
+        if (selectedDifficulty) {
+          results = results.filter((e) => e.difficulty === selectedDifficulty);
+        }
+        if (selectedMuscleGroup) {
+          results = results.filter((e) => e.muscleGroups.includes(selectedMuscleGroup));
+        }
+        setExercises(results);
+        return;
+      }
+
+      // No search term — use the regular filtered endpoint
       const params: any = {
         page: 1,
         limit: 50,
         sortBy,
-        sortOrder: "desc"
+        sortOrder: "desc",
       };
 
-      if (searchTerm) params.search = searchTerm;
       if (selectedCategory) params.category = selectedCategory;
       if (selectedDifficulty) params.difficulty = selectedDifficulty;
+      if (selectedMuscleGroup) params.muscleGroups = selectedMuscleGroup;
 
       const response = await apiService.getExercises(params);
-      console.log('Fetched exercises:', response.exercises.map(e => ({ name: e.name, videoUrl: e.videoUrl })));
       setExercises(response.exercises);
     } catch (error) {
       console.error("Failed to fetch exercises:", error);
@@ -114,22 +210,28 @@ const Exercises = () => {
     }
 
     try {
-      await apiService.rateExercise(exerciseId, rating);
+      const res: any = await apiService.rateExercise(exerciseId, rating);
       toast({
-        title: "Success",
-        description: `You rated this exercise ${rating} star${rating !== 1 ? 's' : ''}!`,
+        title: "Rating submitted",
+        description: `You rated this exercise ${rating}/5. Average is now ${res.averageRating?.toFixed(1)}/5 (${res.totalRatings} ratings).`,
       });
-      // Refresh the selected exercise to show updated rating
-      if (selectedExercise) {
-        const updatedExercise = await apiService.getExerciseById(exerciseId);
-        setSelectedExercise(updatedExercise);
+
+      // Update local state immediately without a full refetch
+      const patch = {
+        averageRating: res.averageRating,
+        totalRatings: res.totalRatings,
+        userRating: rating,
+      };
+      setExercises(prev =>
+        prev.map(ex => ex._id === exerciseId ? { ...ex, ...patch } : ex)
+      );
+      if (selectedExercise?._id === exerciseId) {
+        setSelectedExercise(prev => prev ? { ...prev, ...patch } : prev);
       }
-      // Refresh exercises list to show updated rating
-      fetchExercises();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to rate exercise. Please try again.",
+        description: error.message || "Failed to rate exercise.",
         variant: "destructive",
       });
     }
@@ -167,26 +269,103 @@ const Exercises = () => {
     return null;
   };
 
-  const renderStars = (rating: number, onRate?: (rating: number) => void) => {
+  const renderStars = (rating: number, totalRatings?: number, onRate?: (rating: number) => void) => {
+    const isInteractive = !!onRate;
+    if (!isInteractive && (!totalRatings || totalRatings === 0)) {
+      return <span className="text-sm text-muted-foreground">No reviews yet</span>;
+    }
     return (
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
             className={`w-4 h-4 transition-all ${
-              star <= rating
+              star <= Math.round(rating)
                 ? "fill-yellow-400 text-yellow-400"
                 : "text-gray-300"
-            } ${onRate ? "cursor-pointer hover:scale-110 hover:text-yellow-400" : ""}`}
+            } ${isInteractive ? "cursor-pointer hover:scale-110 hover:text-yellow-400" : ""}`}
             onClick={() => onRate && onRate(star)}
           />
         ))}
-        <span className="text-sm text-muted-foreground ml-1">
-          ({rating.toFixed(1)})
-        </span>
+        {(totalRatings && totalRatings > 0) || isInteractive ? (
+          <span className="text-sm text-muted-foreground ml-1">
+            ({rating.toFixed(1)})
+          </span>
+        ) : null}
       </div>
     );
   };
+
+  // Reusable exercise card
+  const ExerciseCard = ({ exercise }: { exercise: Exercise }) => (
+    <Card
+      key={exercise._id}
+      className="p-6 card-hover cursor-pointer"
+      onClick={() => setSelectedExercise(exercise)}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xl font-heading font-bold">{exercise.name}</h3>
+          {exercise.videoUrl && (
+            <Video className="w-4 h-4 text-primary" title="Has tutorial video" />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => toggleFavorite(e, exercise._id)}
+            className="p-1 rounded-full hover:bg-muted transition-colors"
+            title={favoriteIds.has(exercise._id) ? "Remove from favourites" : "Add to favourites"}
+          >
+            <Heart
+              className={`w-5 h-5 transition-colors ${
+                favoriteIds.has(exercise._id)
+                  ? "fill-red-500 text-red-500"
+                  : "text-muted-foreground hover:text-red-400"
+              } ${favLoading.has(exercise._id) ? "opacity-50" : ""}`}
+            />
+          </button>
+          <Badge className={getDifficultyColor(exercise.difficulty)}>
+            {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Badge variant="outline">
+          {exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
+        </Badge>
+        {exercise.muscleGroups.slice(0, 2).map((muscle) => (
+          <Badge key={muscle} variant="secondary" className="text-xs">
+            {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
+          </Badge>
+        ))}
+        {exercise.muscleGroups.length > 2 && (
+          <Badge variant="secondary" className="text-xs">
+            +{exercise.muscleGroups.length - 2}
+          </Badge>
+        )}
+      </div>
+
+      <p className="text-muted-foreground mb-3 line-clamp-2">{exercise.description}</p>
+
+      <div className="flex items-center justify-between">
+        {renderStars(exercise.averageRating, exercise.totalRatings)}
+        {exercise.totalRatings > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {exercise.totalRatings} {exercise.totalRatings === 1 ? "review" : "reviews"}
+          </span>
+        )}
+      </div>
+
+      {exercise.equipment.length > 0 && !exercise.equipment.includes("none") && (
+        <div className="mt-2">
+          <span className="text-xs text-muted-foreground">
+            Equipment: {exercise.equipment.join(", ")}
+          </span>
+        </div>
+      )}
+    </Card>
+  );
 
   if (loading) {
     return (
@@ -203,7 +382,9 @@ const Exercises = () => {
   return (
     <div className="min-h-screen py-12">
       <div className="container mx-auto px-4">
-        <div className="mb-12">
+
+        {/* Header */}
+        <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl md:text-5xl font-heading font-bold mb-4">Exercise Library</h1>
@@ -217,134 +398,158 @@ const Exercises = () => {
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="mb-8 space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search exercises..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedCategory || "all"} onValueChange={(value) => setSelectedCategory(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {filters.categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedDifficulty || "all"} onValueChange={(value) => setSelectedDifficulty(value === "all" ? "" : value)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  {filters.difficulties.map((difficulty) => (
-                    <SelectItem key={difficulty} value={difficulty}>
-                      {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="popularity">Most Popular</SelectItem>
-                  <SelectItem value="rating">Highest Rated</SelectItem>
-                  <SelectItem value="name">Name A-Z</SelectItem>
-                  <SelectItem value="created">Newest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {exercises.map((exercise) => (
-            <Card
-              key={exercise._id}
-              className="p-6 card-hover cursor-pointer"
-              onClick={() => {
-                console.log('Selected exercise:', exercise.name, 'Video URL:', exercise.videoUrl);
-                console.log('Embed URL:', getYouTubeEmbedUrl(exercise.videoUrl || ''));
-                setSelectedExercise(exercise);
-              }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-heading font-bold">{exercise.name}</h3>
-                  {exercise.videoUrl && (
-                    <Video className="w-4 h-4 text-primary" title="Has tutorial video" />
-                  )}
-                </div>
-                <Badge className={getDifficultyColor(exercise.difficulty)}>
-                  {exercise.difficulty.charAt(0).toUpperCase() + exercise.difficulty.slice(1)}
-                </Badge>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-3">
-                <Badge variant="outline">
-                  {exercise.category.charAt(0).toUpperCase() + exercise.category.slice(1)}
-                </Badge>
-                {exercise.muscleGroups.slice(0, 2).map((muscle) => (
-                  <Badge key={muscle} variant="secondary" className="text-xs">
-                    {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
-                  </Badge>
-                ))}
-                {exercise.muscleGroups.length > 2 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{exercise.muscleGroups.length - 2}
-                  </Badge>
-                )}
-              </div>
-
-              <p className="text-muted-foreground mb-3 line-clamp-2">{exercise.description}</p>
-              
-              <div className="flex items-center justify-between">
-                {renderStars(exercise.averageRating)}
-                <span className="text-xs text-muted-foreground">
-                  {exercise.totalRatings} reviews
-                </span>
-              </div>
-
-              {exercise.equipment.length > 0 && !exercise.equipment.includes("none") && (
-                <div className="mt-2">
-                  <span className="text-xs text-muted-foreground">
-                    Equipment: {exercise.equipment.join(", ")}
+        <Tabs defaultValue="all">
+          <TabsList className="mb-6">
+            <TabsTrigger value="all">All Exercises</TabsTrigger>
+            {user && (
+              <TabsTrigger value="favourites" className="flex items-center gap-1.5">
+                <Heart className="w-4 h-4" />
+                My Favourites
+                {favoriteExercises.length > 0 && (
+                  <span className="ml-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {favoriteExercises.length}
                   </span>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
+                )}
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-        {exercises.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No exercises found matching your criteria.</p>
-          </div>
-        )}
+          {/* ── ALL EXERCISES TAB ── */}
+          <TabsContent value="all">
+            {/* Search and Filters */}
+            <div className="mb-8 space-y-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search exercises..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Select value={selectedCategory || "all"} onValueChange={(value) => setSelectedCategory(value === "all" ? "" : value)}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {filters.categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={selectedMuscleGroup || "all"} onValueChange={(value) => setSelectedMuscleGroup(value === "all" ? "" : value)}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Muscle Group" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Muscles</SelectItem>
+                      {filters.muscleGroups.map((muscle) => (
+                        <SelectItem key={muscle} value={muscle}>
+                          {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={selectedDifficulty || "all"} onValueChange={(value) => setSelectedDifficulty(value === "all" ? "" : value)}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Levels</SelectItem>
+                      {filters.difficulties.map((difficulty) => (
+                        <SelectItem key={difficulty} value={difficulty}>
+                          {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="popularity">Most Popular</SelectItem>
+                      <SelectItem value="rating">Highest Rated</SelectItem>
+                      <SelectItem value="name">Name A-Z</SelectItem>
+                      <SelectItem value="created">Newest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {exercises.map((exercise) => (
+                <ExerciseCard key={exercise._id} exercise={exercise} />
+              ))}
+            </div>
+
+            {exercises.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No exercises found matching your criteria.</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ── MY FAVOURITES TAB ── */}
+          {user && (
+            <TabsContent value="favourites">
+              {favoriteExercises.length === 0 ? (
+                <div className="text-center py-20">
+                  <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-heading font-semibold mb-2">No favourites yet</h3>
+                  <p className="text-muted-foreground">
+                    Click the <Heart className="w-4 h-4 inline text-red-400" /> on any exercise to save it here.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-6">
+                    {favoriteExercises.length} saved {favoriteExercises.length === 1 ? "exercise" : "exercises"}
+                  </p>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {favoriteExercises.map((exercise) => (
+                      <ExerciseCard key={exercise._id} exercise={exercise} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
 
       <Dialog open={!!selectedExercise} onOpenChange={() => setSelectedExercise(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-heading font-bold">
-              {selectedExercise?.name}
-            </DialogTitle>
+            <div className="flex items-center justify-between pr-6">
+              <DialogTitle className="text-2xl font-heading font-bold">
+                {selectedExercise?.name}
+              </DialogTitle>
+              {selectedExercise && (
+                <button
+                  onClick={(e) => toggleFavorite(e, selectedExercise._id)}
+                  className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                  title={favoriteIds.has(selectedExercise._id) ? "Remove from favourites" : "Add to favourites"}
+                >
+                  <Heart
+                    className={`w-6 h-6 transition-colors ${
+                      favoriteIds.has(selectedExercise._id)
+                        ? "fill-red-500 text-red-500"
+                        : "text-muted-foreground hover:text-red-400"
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
           </DialogHeader>
           
           {selectedExercise && (
@@ -442,12 +647,14 @@ const Exercises = () => {
                 <h4 className="font-heading font-bold mb-2">Rating</h4>
                 <div className="space-y-2">
                   <div className="flex items-center gap-4">
-                    {renderStars(selectedExercise.averageRating, (rating) => 
+                    {renderStars(selectedExercise.averageRating, selectedExercise.totalRatings, (rating) =>
                       handleRateExercise(selectedExercise._id, rating)
                     )}
-                    <span className="text-sm text-muted-foreground">
-                      Based on {selectedExercise.totalRatings} {selectedExercise.totalRatings === 1 ? 'review' : 'reviews'}
-                    </span>
+                    {selectedExercise.totalRatings > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        Based on {selectedExercise.totalRatings} {selectedExercise.totalRatings === 1 ? 'review' : 'reviews'}
+                      </span>
+                    )}
                   </div>
                   {user && (
                     <p className="text-xs text-muted-foreground">
@@ -462,9 +669,7 @@ const Exercises = () => {
                 </div>
               </div>
 
-              <div className="text-sm text-muted-foreground">
-                Created by: {selectedExercise.createdBy.name} ({selectedExercise.createdBy.userType})
-              </div>
+
             </div>
           )}
         </DialogContent>

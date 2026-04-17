@@ -6,9 +6,10 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, userType: 'user' | 'trainer' | 'admin', additionalData?: any) => Promise<void>;
+  register: (name: string, email: string, password: string, userType: 'user' | 'trainer' | 'admin', additionalData?: any) => Promise<any>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  loginWithToken: (token: string, user: User) => void;
   loading: boolean;
 }
 
@@ -80,15 +81,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const registrationPayload = additionalData || { name, email, password, userType };
       const response = await apiService.register(registrationPayload);
-      
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      
-      setToken(response.token);
-      setUser(response.user);
-      
-      // Connect to WebSocket
-      socketService.connect(response.token);
+      // Note: no auto-login — user must verify email first
+      return response;
     } catch (error) {
       throw error;
     }
@@ -119,6 +113,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     refreshUser,
+    loginWithToken: (t: string, u: User) => {
+      localStorage.setItem('token', t);
+      localStorage.setItem('user', JSON.stringify(u));
+      setToken(t);
+      setUser(u);
+      socketService.connect(t);
+    },
     loading,
   };
 

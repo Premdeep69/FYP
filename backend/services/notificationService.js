@@ -256,7 +256,7 @@ export const scheduleDailyWorkoutReminders = async () => {
     // Find all users with active workout plans and reminder preferences
     const users = await User.find({
       fcmToken: { $exists: true, $ne: null },
-      'preferences.workoutReminders': true
+      'profile.preferences.notifications.workoutReminders': { $ne: false },
     });
 
     console.log(`Scheduling reminders for ${users.length} users`);
@@ -291,10 +291,18 @@ export const checkStreakMilestones = async (userId, currentStreak) => {
 // Check and send goal achievement notifications
 export const checkGoalAchievement = async (userId, goals) => {
   for (const goal of goals) {
-    if (goal.currentValue >= goal.targetValue && !goal.achieved) {
-      await sendGoalAchieved(userId, goal.title);
-      // Mark goal as achieved in database
-      goal.achieved = true;
+    if (goal.currentValue >= goal.targetValue) {
+      // Use a flag in metadata or check if we already sent this notification
+      // by comparing currentValue vs targetValue — only notify once per goal completion
+      const alreadyNotified = goal._notifiedAchieved === true;
+      if (!alreadyNotified) {
+        await sendGoalAchieved(userId, goal.title);
+        // Persist the notification flag so we don't re-notify on next check
+        if (goal._id) {
+          const GoalModel = (await import('../models/goal.js')).default;
+          await GoalModel.findByIdAndUpdate(goal._id, { isActive: false });
+        }
+      }
     }
   }
 };

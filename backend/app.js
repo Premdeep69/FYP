@@ -1,7 +1,13 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import connectDB from "./config/db.js";
+
+// Load env vars synchronously — resolve path relative to this file
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, ".env") });
 
 // Routes
 import adminRoutes from "./routes/admin.js";
@@ -14,6 +20,7 @@ import notificationRoutes from "./routes/notification.js";
 import paymentRoutes from "./routes/payment.js";
 import seedRoutes from "./routes/seed.js";
 import sessionSlotRoutes from "./routes/sessionSlot.js";
+import sessionRequestRoutes from "./routes/sessionRequest.js";
 import workoutRoutes from "./routes/workout.js";
 
 dotenv.config();
@@ -24,16 +31,32 @@ const app = express();
 connectDB();
 
 // Middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:8080',
+  'http://localhost:8081',
+  'http://localhost:5173',
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 // Handle preflight requests
-app.options("*", cors({
-  origin: process.env.FRONTEND_URL,
+app.options("/*splat", cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true
 }));
 
@@ -55,6 +78,7 @@ const routes = [
   { path: "/api/notifications", handler: notificationRoutes },
   { path: "/api/bookings", handler: bookingRoutes },
   { path: "/api/session-slots", handler: sessionSlotRoutes },
+  { path: "/api/session-requests", handler: sessionRequestRoutes },
   { path: "/api/admin", handler: adminRoutes },
 ];
 

@@ -14,8 +14,21 @@ export const protect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select("-password");
-    
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized, user not found" });
+    }
+
+    // Account was deleted by admin
+    if (user.isDeleted) {
+      return res.status(403).json({
+        message: "Your account has been deleted by an administrator.",
+        accountDeleted: true,
+      });
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     res.status(401).json({ message: "Not authorized, token failed" });
@@ -25,8 +38,8 @@ export const protect = async (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.userType)) {
-      return res.status(403).json({ 
-        message: `User role ${req.user.userType} is not authorized to access this route` 
+      return res.status(403).json({
+        message: `User role ${req.user.userType} is not authorized to access this route`,
       });
     }
     next();

@@ -49,19 +49,19 @@ router.delete("/:id/favorite", removeFromFavorites);
 // Rate exercise
 router.post("/:id/rate", rateExercise);
 
-// Trainer routes
-router.post("/", authorize("trainer"), createExercise);
-router.put("/:id", authorize("trainer"), updateExercise);
-router.delete("/:id", authorize("trainer"), deleteExercise);
-router.post("/:id/duplicate", authorize("trainer"), duplicateExercise);
+// Trainer/Admin routes
+router.post("/", authorize("trainer", "admin"), createExercise);
+router.put("/:id", authorize("trainer", "admin"), updateExercise);
+router.delete("/:id", authorize("trainer", "admin"), deleteExercise);
+router.post("/:id/duplicate", authorize("trainer", "admin"), duplicateExercise);
 
-// Bulk operations (trainer only)
-router.post("/bulk/create", authorize("trainer"), bulkCreateExercises);
-router.put("/bulk/update", authorize("trainer"), bulkUpdateExercises);
-router.delete("/bulk/delete", authorize("trainer"), bulkDeleteExercises);
+// Bulk operations (trainer/admin)
+router.post("/bulk/create", authorize("trainer", "admin"), bulkCreateExercises);
+router.put("/bulk/update", authorize("trainer", "admin"), bulkUpdateExercises);
+router.delete("/bulk/delete", authorize("trainer", "admin"), bulkDeleteExercises);
 
-// Admin routes (if you have admin role)
-// router.post("/:id/restore", authorize("admin"), restoreExercise);
-// router.delete("/:id/permanent", authorize("admin"), permanentlyDeleteExercise);
+// Admin-only routes
+router.post("/:id/restore", authorize("admin"), restoreExercise);
+router.delete("/:id/permanent", authorize("admin"), permanentlyDeleteExercise);
 
 export default router;

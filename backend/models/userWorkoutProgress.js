@@ -108,6 +108,12 @@ const userWorkoutProgressSchema = new mongoose.Schema(
       reason: String,
       modifiedAt: { type: Date, default: Date.now },
     }],
+    // User's rating for this plan (1-5)
+    userRating: {
+      type: Number,
+      min: 1,
+      max: 5,
+    },
   },
   { timestamps: true }
 );

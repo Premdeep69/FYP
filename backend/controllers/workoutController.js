@@ -20,7 +20,13 @@ export const getWorkoutPlans = async (req, res) => {
     } = req.query;
 
     // Build filter object
-    const filter = { isPublic: true };
+    const filter = {};
+    // Non-admin requests only see public plans
+    if (req.query.isPublic !== undefined) {
+      filter.isPublic = req.query.isPublic === 'true';
+    } else if (!req.user || req.user.userType !== 'admin') {
+      filter.isPublic = true;
+    }
     
     if (category) filter.category = category;
     if (difficulty) filter.difficulty = difficulty;
@@ -160,8 +166,8 @@ export const updateWorkoutPlan = async (req, res) => {
       return res.status(404).json({ message: "Workout plan not found" });
     }
 
-    // Check if user is the creator
-    if (workoutPlan.createdBy.toString() !== userId.toString()) {
+    // Check if user is the creator or admin
+    if (workoutPlan.createdBy.toString() !== userId.toString() && req.user.userType !== "admin") {
       return res.status(403).json({ message: "Not authorized to update this workout plan" });
     }
 
@@ -191,8 +197,8 @@ export const deleteWorkoutPlan = async (req, res) => {
       return res.status(404).json({ message: "Workout plan not found" });
     }
 
-    // Check if user is the creator
-    if (workoutPlan.createdBy.toString() !== userId.toString()) {
+    // Check if user is the creator or admin
+    if (workoutPlan.createdBy.toString() !== userId.toString() && req.user.userType !== "admin") {
       return res.status(403).json({ message: "Not authorized to delete this workout plan" });
     }
 
@@ -407,6 +413,58 @@ export const getPopularWorkoutPlans = async (req, res) => {
 
     res.json(workoutPlans);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Rate a workout plan (only users who have enrolled and completed at least one workout)
+export const rateWorkoutPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating } = req.body;
+    const userId = req.user._id;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const plan = await WorkoutPlan.findById(id);
+    if (!plan) return res.status(404).json({ message: "Workout plan not found" });
+
+    // User must be enrolled
+    const progress = await UserWorkoutProgress.findOne({ userId, workoutPlanId: id });
+    if (!progress) {
+      return res.status(403).json({ message: "You must be enrolled to rate this plan" });
+    }
+
+    // Prevent duplicate rating — store one rating per user in progress
+    const alreadyRated = progress.userRating && progress.userRating > 0;
+    progress.userRating = rating;
+    await progress.save();
+
+    // Recompute aggregate from ALL enrolled users who have rated
+    const allProgress = await UserWorkoutProgress.find({
+      workoutPlanId: id,
+      userRating: { $exists: true, $gt: 0 },
+    }).select("userRating");
+
+    const count = allProgress.length;
+    const sum = allProgress.reduce((s, p) => s + (p.userRating || 0), 0);
+    const newAverage = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+
+    await WorkoutPlan.findByIdAndUpdate(id, {
+      averageRating: newAverage,
+      totalRatings: count,
+    });
+
+    res.json({
+      message: alreadyRated ? "Rating updated" : "Rating submitted",
+      userRating: rating,
+      averageRating: newAverage,
+      totalRatings: count,
+    });
+  } catch (error) {
+    console.error("rateWorkoutPlan error:", error);
     res.status(500).json({ message: error.message });
   }
 };

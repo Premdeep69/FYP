@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Elements } from '@stripe/react-stripe-js';
-import { stripePromise } from '@/config/stripe';
-import SubscriptionPlans from '@/components/SubscriptionPlans';
 import PaymentHistory from '@/components/PaymentHistory';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -130,8 +127,7 @@ const Subscription: React.FC = () => {
   }
 
   return (
-    <Elements stripe={stripePromise}>
-      <div className="min-h-screen py-12">
+    <div className="min-h-screen py-12">
         <div className="container mx-auto px-4">
           <div className="mb-8">
             <h1 className="text-4xl md:text-5xl font-heading font-bold mb-4">
@@ -143,9 +139,8 @@ const Subscription: React.FC = () => {
           </div>
 
           <Tabs defaultValue="current" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="current">Current Plans</TabsTrigger>
-              <TabsTrigger value="plans">Available Plans</TabsTrigger>
               <TabsTrigger value="history">Payment History</TabsTrigger>
             </TabsList>
 
@@ -235,17 +230,10 @@ const Subscription: React.FC = () => {
                   <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No Active Subscriptions</h3>
                   <p className="text-muted-foreground mb-4">
-                    You don't have any active subscriptions. Choose a plan to get started.
+                    You don't have any active subscriptions.
                   </p>
-                  <Button onClick={() => document.querySelector('[value="plans"]')?.click()}>
-                    View Available Plans
-                  </Button>
                 </Card>
               )}
-            </TabsContent>
-
-            <TabsContent value="plans">
-              <SubscriptionPlans />
             </TabsContent>
 
             <TabsContent value="history">
@@ -254,7 +242,6 @@ const Subscription: React.FC = () => {
           </Tabs>
         </div>
       </div>
-    </Elements>
   );
 };
 

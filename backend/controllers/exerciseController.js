@@ -3,7 +3,8 @@ import User from "../models/users.js";
 
 // Helper function for building filters
 const buildExerciseFilter = (query) => {
-  const filter = { isActive: true };
+  // Admin can see all exercises including inactive ones
+  const filter = query.isAdmin === "true" ? {} : { isActive: true };
   
   if (query.category) {
     filter.category = query.category;
@@ -259,14 +260,14 @@ export const getExerciseFilters = async (req, res) => {
   }
 };
 
-// Rate an exercise
+// Rate an exercise — saves to user profile AND recomputes exercise aggregate
 export const rateExercise = async (req, res) => {
   try {
     const { id } = req.params;
     const { rating } = req.body;
     const userId = req.user._id;
 
-    if (rating < 1 || rating > 5) {
+    if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Rating must be between 1 and 5" });
     }
 
@@ -275,31 +276,47 @@ export const rateExercise = async (req, res) => {
       return res.status(404).json({ message: "Exercise not found" });
     }
 
-    // Check if user already rated this exercise
+    // Save/update rating on the user document
     const user = await User.findById(userId);
-    const existingRating = user.exerciseRatings?.find(r => r.exerciseId.toString() === id);
+    if (!user.exerciseRatings) user.exerciseRatings = [];
 
-    if (existingRating) {
-      // Update existing rating
-      existingRating.rating = rating;
-      existingRating.ratedAt = new Date();
+    const existingIdx = user.exerciseRatings.findIndex(
+      r => r.exerciseId.toString() === id
+    );
+    if (existingIdx >= 0) {
+      user.exerciseRatings[existingIdx].rating = rating;
+      user.exerciseRatings[existingIdx].ratedAt = new Date();
     } else {
-      // Add new rating
-      if (!user.exerciseRatings) user.exerciseRatings = [];
-      user.exerciseRatings.push({
-        exerciseId: id,
-        rating,
-        ratedAt: new Date(),
-      });
+      user.exerciseRatings.push({ exerciseId: id, rating, ratedAt: new Date() });
     }
-
     await user.save();
+
+    // Recompute aggregate from ALL users who rated this exercise
+    const usersWithRating = await User.find(
+      { "exerciseRatings.exerciseId": exercise._id },
+      { "exerciseRatings.$": 1 }
+    );
+
+    let sum = 0, count = 0;
+    for (const u of usersWithRating) {
+      const r = u.exerciseRatings?.[0];
+      if (r && r.rating > 0) { sum += r.rating; count++; }
+    }
+    const newAverage = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+
+    await Exercise.findByIdAndUpdate(id, {
+      averageRating: newAverage,
+      totalRatings: count,
+    });
 
     res.json({
       message: "Exercise rated successfully",
       userRating: rating,
+      averageRating: newAverage,
+      totalRatings: count,
     });
   } catch (error) {
+    console.error("rateExercise error:", error);
     res.status(500).json({ message: error.message });
   }
 };

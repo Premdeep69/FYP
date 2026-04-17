@@ -13,7 +13,6 @@ import {
 import { Video, ExternalLink, Copy, Check, Clock, AlertCircle } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 
 interface MeetingInfoProps {
   slotId: string;
@@ -35,7 +34,6 @@ const MeetingInfo: React.FC<MeetingInfoProps> = ({
   onOpenChange,
 }) => {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [meetingInfo, setMeetingInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -73,12 +71,6 @@ const MeetingInfo: React.FC<MeetingInfoProps> = ({
       description: 'Meeting link copied to clipboard',
     });
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleJoinBuiltinCall = () => {
-    if (meetingInfo?.meetingInfo?.roomId) {
-      navigate(`/video-call?room=${meetingInfo.meetingInfo.roomId}&token=${meetingInfo.meetingInfo.roomToken}`);
-    }
   };
 
   const handleOpenExternalLink = () => {
@@ -214,35 +206,6 @@ const MeetingInfo: React.FC<MeetingInfoProps> = ({
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Open Meeting Link
                     </Button>
-                  </>
-                )}
-
-                {meetingInfo.meetingInfo.type === 'builtin' && (
-                  <>
-                    <Alert>
-                      <Video className="h-4 w-4" />
-                      <AlertDescription>
-                        This session uses the built-in video call system. Click the button below to join the meeting room.
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm font-medium mb-1">Room ID</p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {meetingInfo.meetingInfo.roomId}
-                      </p>
-                    </div>
-
-                    <Button onClick={handleJoinBuiltinCall} className="w-full">
-                      <Video className="w-4 h-4 mr-2" />
-                      Join Video Call
-                    </Button>
-
-                    {meetingInfo.meetingInfo.expiresAt && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Room expires: {new Date(meetingInfo.meetingInfo.expiresAt).toLocaleString()}
-                      </p>
-                    )}
                   </>
                 )}
               </CardContent>

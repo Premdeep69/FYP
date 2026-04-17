@@ -3,11 +3,29 @@
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
- "scripts": {
-  "start": "node server.js",
-  "dev": "nodemon server.js",
-  "build": "echo \"no build\""
-},
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo \"no build\"",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.js$": "babel-jest"
+    },
+    "testEnvironment": "node",
+    "verbose": true,
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "controllers/**/*.js",
+      "middleware/**/*.js",
+      "services/**/*.js",
+      "jobs/**/*.js"
+    ]
+  },
   "engines": {
     "node": "22.x"
   },
@@ -20,14 +38,23 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
     "firebase-admin": "^13.6.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.5",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.5",
     "pdfkit": "^0.17.2",
     "socket.io": "^4.8.3",
     "stripe": "^20.3.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
+    "@jest/globals": "^30.3.0",
+    "babel-jest": "^30.3.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
+    "jest": "^30.3.0",
     "nodemon": "^3.1.11"
   }
 }

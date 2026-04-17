@@ -1,17 +1,18 @@
 import Stripe from 'stripe';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-if (process.env.NODE_ENV !== "production") {
-  import('dotenv').then(dotenv => dotenv.config());
-}
-
+// Ensure env is loaded — resolve relative to this file so it works from any cwd
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../.env') });
 
 let stripe = null;
 
-if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.includes('your_stripe')) {
+const key = process.env.STRIPE_SECRET_KEY;
+if (key && !key.includes('your_stripe')) {
   try {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16',
-    });
+    stripe = new Stripe(key, { apiVersion: '2023-10-16' });
     console.log('✓ Stripe initialized successfully');
   } catch (error) {
     console.warn('⚠ Stripe initialization failed:', error.message);

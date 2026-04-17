@@ -414,7 +414,7 @@ export const getTrainerDashboard = async (req, res) => {
         $match: {
           trainerId: trainerId,
           scheduledDate: { $gte: thirtyDaysAgo },
-          status: { $in: ["completed", "confirmed", "scheduled"] }
+          status: { $in: ["completed", "confirmed", "pending"] }
         }
       },
       {
@@ -553,7 +553,7 @@ export const logWorkout = async (req, res) => {
     setImmediate(async () => {
       try {
         // Send workout completed notification
-        if (user.preferences?.progressUpdates !== false) {
+        if (user.profile?.preferences?.notifications?.workoutReminders !== false) {
           await notificationService.sendWorkoutCompleted(userId, name, {
             calories: caloriesBurned,
             duration
@@ -617,20 +617,50 @@ export const updateGoals = async (req, res) => {
     const userId = req.user._id;
     const { goals } = req.body;
 
-    // Delete existing active goals
-    await Goal.deleteMany({ userId, isActive: true });
+    if (!Array.isArray(goals)) {
+      return res.status(400).json({ message: "goals must be an array" });
+    }
 
-    // Create new goals
-    const newGoals = goals.map(goal => ({
-      ...goal,
-      userId,
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 1 week from now
-    }));
+    // Upsert each goal by _id (if provided) or type — preserves currentValue
+    const ops = goals.map(goal => {
+      const filter = goal._id
+        ? { _id: goal._id, userId }
+        : { userId, type: goal.type, isActive: true };
 
-    const createdGoals = await Goal.insertMany(newGoals);
+      const update = {
+        $set: {
+          ...goal,
+          userId,
+          startDate: goal.startDate || new Date(),
+          endDate: goal.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          isActive: true,
+        },
+        $setOnInsert: { currentValue: 0 }, // only set on new docs
+      };
+      delete update.$set._id; // don't overwrite _id
 
-    res.json({ message: "Goals updated successfully", goals: createdGoals });
+      return {
+        updateOne: {
+          filter,
+          update,
+          upsert: true,
+        },
+      };
+    });
+
+    await Goal.bulkWrite(ops);
+
+    // Deactivate goals not in the new list (by type)
+    const activeTypes = goals.map(g => g.type).filter(Boolean);
+    if (activeTypes.length > 0) {
+      await Goal.updateMany(
+        { userId, isActive: true, type: { $nin: activeTypes } },
+        { isActive: false }
+      );
+    }
+
+    const updatedGoals = await Goal.find({ userId, isActive: true });
+    res.json({ message: "Goals updated successfully", goals: updatedGoals });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

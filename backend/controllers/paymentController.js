@@ -284,6 +284,46 @@ export const cancelSubscription = async (req, res) => {
   }
 };
 
+// Get trainer's received payment history (list of individual payments)
+export const getTrainerPaymentHistory = async (req, res) => {
+  try {
+    const trainerId = req.user._id;
+    const { page = 1, limit = 10, status, search } = req.query;
+
+    const query = { trainerId, paymentType: 'session' };
+    if (status && status !== 'all') query.status = status;
+
+    const payments = await Payment.find(query)
+      .populate('userId', 'name email')
+      .populate('sessionId', 'scheduledDate startTime endTime duration sessionType')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
+
+    const total = await Payment.countDocuments(query);
+
+    // Apply search filter on populated fields
+    let filtered = payments;
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = payments.filter(p =>
+        p.userId?.name?.toLowerCase().includes(q) ||
+        p.userId?.email?.toLowerCase().includes(q) ||
+        p.stripePaymentIntentId?.toLowerCase().includes(q)
+      );
+    }
+
+    res.json({
+      payments: filtered,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
+      total,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get trainer earnings
 export const getTrainerEarnings = async (req, res) => {
   try {
@@ -413,7 +453,7 @@ const handlePaymentIntentSucceeded = async (paymentIntent) => {
     }
   );
 
-  // If it's a session payment, update session status to confirmed
+  // Confirm session booking payment
   if (paymentIntent.metadata.type === 'session' && paymentIntent.metadata.sessionId) {
     await Session.findByIdAndUpdate(
       paymentIntent.metadata.sessionId,
@@ -422,6 +462,76 @@ const handlePaymentIntentSucceeded = async (paymentIntent) => {
         paymentStatus: 'paid'
       }
     );
+  }
+
+  // Confirm session request payment — auto-create slot + booking via the controller logic
+  if (paymentIntent.metadata.type === 'session_request' && paymentIntent.metadata.sessionRequestId) {
+    try {
+      const SessionRequest = (await import('../models/sessionRequest.js')).default;
+      const SessionSlot = (await import('../models/sessionSlot.js')).default;
+      const request = await SessionRequest.findById(paymentIntent.metadata.sessionRequestId);
+
+      if (request && request.status === 'awaiting_payment' && !request.createdBookingId) {
+        const User = (await import('../models/users.js')).default;
+        const calcEndTime = (startTime, durationMinutes) => {
+          const [h, m] = startTime.split(':').map(Number);
+          const total = h * 60 + m + durationMinutes;
+          return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+        };
+        const userDoc = await User.findById(request.userId);
+        const endTime = calcEndTime(request.preferredTime, request.duration || 60);
+
+        const slot = await SessionSlot.create({
+          trainerId: request.trainerId,
+          title: `Session with ${userDoc?.name || 'Client'}`,
+          sessionType: request.sessionType,
+          mode: request.mode,
+          location: (request.mode === 'offline' || request.mode === 'hybrid') ? (request.location || 'To be confirmed') : undefined,
+          date: request.preferredDate,
+          startTime: request.preferredTime,
+          endTime,
+          duration: request.duration || 60,
+          price: request.agreedPrice,
+          maxParticipants: 1,
+          currentParticipants: 1,
+          status: 'full',
+          bookedBy: [{ userId: request.userId, bookedAt: new Date(), hasAccess: true }],
+        });
+
+        const booking = await Session.create({
+          trainerId: request.trainerId,
+          clientId: request.userId,
+          sessionType: request.sessionType,
+          scheduledDate: request.preferredDate,
+          startTime: request.preferredTime,
+          endTime,
+          duration: request.duration || 60,
+          price: request.agreedPrice,
+          status: 'confirmed',
+          paymentStatus: 'paid',
+          paymentId: request.paymentId || undefined,
+          clientNotes: request.message,
+        });
+
+        slot.bookedBy[0].bookingId = booking._id;
+        await slot.save();
+
+        if (request.paymentId) {
+          await Payment.findByIdAndUpdate(request.paymentId, { status: 'succeeded' });
+        }
+
+        request.status = 'confirmed';
+        request.createdSlotId = slot._id;
+        request.createdBookingId = booking._id;
+        await request.save();
+
+        const syncService = (await import('../services/syncService.js')).default;
+        syncService.emit('sessionRequest:confirmed', { request, slot, booking });
+        console.log(`[webhook] Session request ${request._id} confirmed via webhook`);
+      }
+    } catch (err) {
+      console.error('[webhook] Failed to auto-confirm session request:', err.message);
+    }
   }
 };
 

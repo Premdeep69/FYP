@@ -17,8 +17,10 @@ import {
   Users, UserCheck, DollarSign, TrendingUp, CheckCircle, XCircle,
   UserPlus, LogOut, Search, Filter, ArrowUpDown, Eye, Receipt,
   CreditCard, Clock, AlertCircle, RefreshCw, ChevronLeft, ChevronRight,
-  FileText, File, Download,
+  FileText, File, Download, Dumbbell, ClipboardList,
 } from 'lucide-react';
+import ExercisesTab from '@/components/admin/ExercisesTab';
+import WorkoutPlansTab from '@/components/admin/WorkoutPlansTab';
 
 // ── Billing sub-component ────────────────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -412,7 +414,7 @@ export default function AdminDashboard() {
     try {
       const [s, u, t, pt] = await Promise.all([
         apiService.getAdminStats(),
-        apiService.getAdminUsers({ limit: 100 }),
+        apiService.getAdminUsers({ limit: 100, userType: 'user' }),
         apiService.getAdminTrainers(),
         apiService.getPendingTrainers(),
       ]);
@@ -448,6 +450,17 @@ export default function AdminDashboard() {
     try {
       await apiService.toggleUserActive(userId);
       toast({ title: 'User status updated' });
+      loadAll();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, name: string) => {
+    if (!window.confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await apiService.adminDeleteUser(userId);
+      toast({ title: 'User deleted', description: `${name} has been removed.` });
       loadAll();
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -534,7 +547,7 @@ export default function AdminDashboard() {
 
         {/* Tabs */}
         <Tabs defaultValue="billing">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex-wrap h-auto gap-1">
             <TabsTrigger value="billing">
               <Receipt className="w-4 h-4 mr-1.5" /> Billing
             </TabsTrigger>
@@ -545,7 +558,13 @@ export default function AdminDashboard() {
               )}
             </TabsTrigger>
             <TabsTrigger value="trainers">All Trainers</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="users">Members</TabsTrigger>
+            <TabsTrigger value="exercises">
+              <Dumbbell className="w-4 h-4 mr-1.5" /> Exercises
+            </TabsTrigger>
+            <TabsTrigger value="workout-plans">
+              <ClipboardList className="w-4 h-4 mr-1.5" /> Workout Plans
+            </TabsTrigger>
           </TabsList>
 
           {/* Billing Tab */}
@@ -585,6 +604,10 @@ export default function AdminDashboard() {
                             <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
                               onClick={() => { setReviewDialog({ open: true, trainer, action: 'reject' }); setReviewNotes(''); }}>
                               <XCircle className="w-4 h-4 mr-1" /> Reject
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-gray-600 border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                              onClick={() => handleDeleteUser(trainer._id, trainer.name)}>
+                              Delete
                             </Button>
                           </div>
                         </div>
@@ -660,6 +683,10 @@ export default function AdminDashboard() {
                         <Button size="sm" variant="outline" onClick={() => handleToggleActive(trainer._id)}>
                           {trainer.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+                          onClick={() => handleDeleteUser(trainer._id, trainer.name)}>
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -672,7 +699,7 @@ export default function AdminDashboard() {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Users ({users.length})</CardTitle>
+                <CardTitle className="text-base">Members ({users.length})</CardTitle>
                 <Input placeholder="Search by name or email..." value={userSearch}
                   onChange={e => setUserSearch(e.target.value)} className="mt-2 max-w-sm" />
               </CardHeader>
@@ -692,6 +719,10 @@ export default function AdminDashboard() {
                         <Button size="sm" variant="outline" onClick={() => handleToggleActive(u._id)}>
                           {u.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
+                          onClick={() => handleDeleteUser(u._id, u.name)}>
+                          Delete
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -699,6 +730,13 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Exercises Tab */}
+          <TabsContent value="exercises"><ExercisesTab /></TabsContent>
+
+          {/* Workout Plans Tab */}
+          <TabsContent value="workout-plans"><WorkoutPlansTab /></TabsContent>
+
         </Tabs>
       </div>
 

@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect } from '../middleware/auth.js';
+import { protect, authorize } from '../middleware/auth.js';
 import User from '../models/users.js';
 import notificationService from '../services/notificationService.js';
 
@@ -14,7 +14,7 @@ router.post('/register-token', protect, async (req, res) => {
       return res.status(400).json({ message: 'FCM token is required' });
     }
 
-    await User.findByIdAndUpdate(req.user.userId, {
+    await User.findByIdAndUpdate(req.user._id, {
       fcmToken: token
     });
 
@@ -30,13 +30,11 @@ router.put('/preferences', protect, async (req, res) => {
   try {
     const { workoutReminders, streakMilestones, goalAchievements, newMessages } = req.body;
 
-    await User.findByIdAndUpdate(req.user.userId, {
-      preferences: {
-        workoutReminders: workoutReminders !== undefined ? workoutReminders : true,
-        streakMilestones: streakMilestones !== undefined ? streakMilestones : true,
-        goalAchievements: goalAchievements !== undefined ? goalAchievements : true,
-        newMessages: newMessages !== undefined ? newMessages : true
-      }
+    await User.findByIdAndUpdate(req.user._id, {
+      'profile.preferences.notifications.workoutReminders': workoutReminders !== undefined ? workoutReminders : true,
+      'profile.preferences.notifications.streakMilestones': streakMilestones !== undefined ? streakMilestones : true,
+      'profile.preferences.notifications.goalAchievements': goalAchievements !== undefined ? goalAchievements : true,
+      'profile.preferences.notifications.newMessages': newMessages !== undefined ? newMessages : true,
     });
 
     res.json({ message: 'Notification preferences updated successfully' });
@@ -49,10 +47,11 @@ router.put('/preferences', protect, async (req, res) => {
 // Get notification preferences
 router.get('/preferences', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('preferences');
+    const user = await User.findById(req.user._id).select('profile');
     
     res.json({
-      preferences: user.preferences || {
+      preferences: user?.profile?.preferences?.notifications || {
+
         workoutReminders: true,
         streakMilestones: true,
         goalAchievements: true,
@@ -68,7 +67,7 @@ router.get('/preferences', protect, async (req, res) => {
 // Test notification endpoint (for development)
 router.post('/test-reminder', protect, async (req, res) => {
   try {
-    await notificationService.sendWorkoutReminder(req.user.userId);
+    await notificationService.sendWorkoutReminder(req.user._id);
     res.json({ message: 'Test reminder sent successfully' });
   } catch (error) {
     console.error('Error sending test reminder:', error);
@@ -76,8 +75,8 @@ router.post('/test-reminder', protect, async (req, res) => {
   }
 });
 
-// Manually trigger daily reminders (admin only - for testing)
-router.post('/trigger-daily-reminders', protect, async (req, res) => {
+// Manually trigger daily reminders (admin only)
+router.post('/trigger-daily-reminders', protect, authorize('admin'), async (req, res) => {
   try {
     // In production, you might want to add admin check here
     await notificationService.scheduleDailyWorkoutReminders();

@@ -22,6 +22,5 @@ router.put("/:slotId", protect, sessionSlotController.updateSlot);
 router.post("/:slotId/cancel", protect, sessionSlotController.cancelSlot);
 router.delete("/:slotId", protect, sessionSlotController.deleteSlot);
 router.post("/:slotId/duplicate", protect, sessionSlotController.duplicateSlot);
-router.post("/:slotId/regenerate-room", protect, sessionSlotController.regenerateVideoCallRoom);
 
 export default router;

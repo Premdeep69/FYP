@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -231,17 +230,12 @@ const Register = () => {
       );
       
       toast({
-        title: "Account Created",
-        description: userType === "trainer"
-          ? "Your trainer account is pending admin approval."
-          : "Welcome! Your account has been created successfully.",
+        title: "Account Created!",
+        description: "We've sent a verification email. Please check your inbox to activate your account.",
       });
-      
-      if (userType === "trainer") {
-        navigate("/pending-approval");
-      } else {
-        navigate("/user-dashboard");
-      }
+
+      // Always redirect to check-email page — login requires verification
+      navigate("/verify-email?sent=true&email=" + encodeURIComponent(registrationData.email));
     } catch (error: any) {
       toast({
         title: "Registration Failed",
@@ -254,12 +248,21 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4">
-      <Card className="w-full max-w-2xl p-8">
+    <div className="min-h-screen bg-muted/30 py-10 px-4">
+      <div className="max-w-2xl mx-auto animate-fade-in">
+        {/* Header */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-heading font-bold">Create Account</h2>
-          <p className="text-muted-foreground">Start your fitness journey today</p>
+          <Link to="/" className="inline-flex items-center gap-2 mb-6">
+            <div className="w-8 h-8 rounded-lg hero-gradient flex items-center justify-center">
+              <span className="text-white text-sm font-bold">SG</span>
+            </div>
+            <span className="font-heading font-bold text-lg">Smart<span className="text-primary">Gym</span></span>
+          </Link>
+          <h1 className="text-2xl font-heading font-bold tracking-tight mb-1.5">Create your account</h1>
+          <p className="text-muted-foreground">Start your fitness journey today — it's free</p>
         </div>
+
+        <div className="bg-card rounded-2xl border border-border/60 shadow-md p-8">
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* User Type Selection */}
@@ -621,20 +624,19 @@ const Register = () => {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating Account..." : "Create Account"}
+          <Button type="submit" className="w-full h-11 font-semibold" disabled={loading}>
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />Creating account...</>
+            ) : "Create Account"}
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm">
-          <p className="text-muted-foreground">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Login
-            </Link>
-          </p>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+        </p>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

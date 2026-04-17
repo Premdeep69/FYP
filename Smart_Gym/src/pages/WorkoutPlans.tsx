@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -76,8 +77,10 @@ const WorkoutPlans = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("beginner");
   const [sortBy, setSortBy] = useState("popularity");
+  const [userPlanRatings, setUserPlanRatings] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchFilters();
@@ -138,9 +141,12 @@ const WorkoutPlans = () => {
     try {
       await apiService.enrollInWorkoutPlan(planId);
       toast({
-        title: "Success",
-        description: "Successfully enrolled in workout plan!",
+        title: "Enrolled successfully!",
+        description: "You can now track your progress in My Workouts.",
       });
+      // Close dialog if open, then redirect
+      setSelectedPlan(null);
+      navigate("/my-workouts");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -150,22 +156,50 @@ const WorkoutPlans = () => {
     }
   };
 
-  const renderStars = (rating: number) => {
+  const handleRatePlan = async (planId: string, rating: number) => {
+    if (!user) {
+      toast({ title: "Login required", description: "Please log in to rate plans.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res: any = await apiService.rateWorkoutPlan(planId, rating);
+      setUserPlanRatings(prev => ({ ...prev, [planId]: rating }));
+      // Update the plan in local state immediately
+      setWorkoutPlans(prev => prev.map(p =>
+        p._id === planId
+          ? { ...p, averageRating: res.averageRating, totalRatings: res.totalRatings }
+          : p
+      ));
+      if (selectedPlan?._id === planId) {
+        setSelectedPlan(prev => prev ? { ...prev, averageRating: res.averageRating, totalRatings: res.totalRatings } : prev);
+      }
+      toast({ title: "Rating submitted", description: `You rated this plan ${rating}/5.` });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to submit rating.", variant: "destructive" });
+    }
+  };
+
+  const renderStars = (rating: number, count: number, onRate?: (r: number) => void) => {
+    const isInteractive = !!onRate;
+    if (!isInteractive && (!count || count === 0)) {
+      return <span className="text-sm text-muted-foreground">No reviews yet</span>;
+    }
     return (
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`w-4 h-4 ${
-              star <= rating
+            className={`w-4 h-4 transition-all ${
+              star <= Math.round(rating)
                 ? "fill-yellow-400 text-yellow-400"
                 : "text-gray-300"
-            }`}
+            } ${isInteractive ? "cursor-pointer hover:scale-110 hover:text-yellow-400" : ""}`}
+            onClick={() => onRate && onRate(star)}
           />
         ))}
-        <span className="text-sm text-muted-foreground ml-1">
-          ({rating.toFixed(1)})
-        </span>
+        {(count > 0 || isInteractive) && (
+          <span className="text-sm text-muted-foreground ml-1">({rating.toFixed(1)})</span>
+        )}
       </div>
     );
   };
@@ -321,15 +355,17 @@ const WorkoutPlans = () => {
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <Users className="w-4 h-4" />
-                                  <span>{plan.totalEnrollments} enrolled</span>
+                                  <span>{plan.totalEnrollments > 0 ? `${plan.totalEnrollments} enrolled` : 'Be the first to enroll'}</span>
                                 </div>
                               </div>
 
                               <div className="flex items-center justify-between">
-                                {renderStars(plan.averageRating)}
-                                <span className="text-sm text-muted-foreground">
-                                  {plan.totalRatings} reviews
-                                </span>
+                                {renderStars(plan.averageRating, plan.totalRatings)}
+                                {plan.totalRatings > 0 && (
+                                  <span className="text-sm text-muted-foreground">
+                                    {plan.totalRatings} {plan.totalRatings === 1 ? 'review' : 'reviews'}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -371,9 +407,7 @@ const WorkoutPlans = () => {
                             </div>
                           )}
 
-                          <div className="text-sm text-muted-foreground mt-4">
-                            Created by: {plan.createdBy.name} ({plan.createdBy.userType})
-                          </div>
+
                         </div>
 
                         <div className="flex flex-col gap-2">
@@ -464,7 +498,9 @@ const WorkoutPlans = () => {
                     <Users className="w-4 h-4 text-primary" />
                     <span className="text-sm font-medium">Enrolled</span>
                   </div>
-                  <p className="text-lg font-bold">{selectedPlan.totalEnrollments}</p>
+                  <p className="text-lg font-bold">
+                    {selectedPlan.totalEnrollments > 0 ? selectedPlan.totalEnrollments : '—'}
+                  </p>
                 </div>
               </div>
 
@@ -568,18 +604,33 @@ const WorkoutPlans = () => {
               {/* Rating */}
               <div>
                 <h4 className="font-heading font-bold mb-2">Rating</h4>
-                <div className="flex items-center gap-4">
-                  {renderStars(selectedPlan.averageRating)}
-                  <span className="text-sm text-muted-foreground">
-                    Based on {selectedPlan.totalRatings} {selectedPlan.totalRatings === 1 ? 'review' : 'reviews'}
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    {renderStars(selectedPlan.averageRating, selectedPlan.totalRatings)}
+                    {selectedPlan.totalRatings > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        Based on {selectedPlan.totalRatings} {selectedPlan.totalRatings === 1 ? 'review' : 'reviews'}
+                      </span>
+                    )}
+                  </div>
+                  {user?.userType === 'user' && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm font-medium mb-2">
+                        {userPlanRatings[selectedPlan._id]
+                          ? `Your rating: ${userPlanRatings[selectedPlan._id]}/5`
+                          : 'Rate this plan (must be enrolled):'}
+                      </p>
+                      {renderStars(
+                        userPlanRatings[selectedPlan._id] ?? 0,
+                        1,
+                        (r) => handleRatePlan(selectedPlan._id, r)
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Creator */}
-              <div className="text-sm text-muted-foreground">
-                Created by: {selectedPlan.createdBy.name} ({selectedPlan.createdBy.userType})
-              </div>
+
 
               {/* Action Button */}
               <div className="flex gap-2 pt-4 border-t border-border">
