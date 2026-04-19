@@ -1,8 +1,8 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
 
 // Load env vars synchronously — resolve path relative to this file
@@ -19,14 +19,16 @@ import exerciseRoutes from "./routes/exercise.js";
 import notificationRoutes from "./routes/notification.js";
 import paymentRoutes from "./routes/payment.js";
 import seedRoutes from "./routes/seed.js";
-import sessionSlotRoutes from "./routes/sessionSlot.js";
 import sessionRequestRoutes from "./routes/sessionRequest.js";
+import sessionSlotRoutes from "./routes/sessionSlot.js";
 import workoutRoutes from "./routes/workout.js";
 
-dotenv.config();
+dotenv.config({
+  path: `.env.${process.env.NODE_ENV || "development"}`
+});
 
 const app = express();
-
+app.set('trust proxy', 1);
 // Connect to MongoDB
 connectDB();
 
