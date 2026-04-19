@@ -36,6 +36,7 @@ const allowedOrigins = [
   'http://localhost:8080',
   'http://localhost:8081',
   'http://localhost:5173',
+  'https://lemon-sand-086fe0300.7.azurestaticapps.net'
 ].filter(Boolean);
 
 app.use(cors({
