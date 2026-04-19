@@ -2,9 +2,9 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
 import app from "./app.js";
-import { handleConnection } from "./socket/socketHandler.js";
 import { startExpiryJob } from "./jobs/expireSessionRequests.js";
 import { initializeSchedulers } from "./jobs/notificationScheduler.js";
+import { handleConnection } from "./socket/socketHandler.js";
 
 const PORT = process.env.PORT;
 
@@ -14,7 +14,7 @@ const server = createServer(app);
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: [process.env.FRONTEND_URL,'https://lemon-sand-086fe0300.7.azurestaticapps.net'],
     methods: ["GET", "POST"],
     credentials: true,
   },
