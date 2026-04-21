@@ -25,6 +25,8 @@ const seedAdmin = async () => {
     password: hashedPassword,
     userType: "admin",
     isActive: true,
+    isVerified: true,
+    emailVerified: true,   // admin bypasses email verification
   });
 
   console.log("Admin created: admin@smartgym.com / Admin@123");

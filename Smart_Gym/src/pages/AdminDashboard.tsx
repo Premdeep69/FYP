@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import Navbar from '@/components/Navbar';
 import { apiService } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Users, UserCheck, DollarSign, TrendingUp, CheckCircle, XCircle,
-  UserPlus, LogOut, Search, Filter, ArrowUpDown, Eye, Receipt,
+  UserPlus, Search, Filter, ArrowUpDown, Eye, Receipt,
   CreditCard, Clock, AlertCircle, RefreshCw, ChevronLeft, ChevronRight,
   FileText, File, Download, Dumbbell, ClipboardList,
 } from 'lucide-react';
@@ -386,7 +387,7 @@ function BillingTab() {
 
 // ── Main AdminDashboard ──────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -493,16 +494,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="text-xl font-semibold text-gray-900">Admin Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{user?.name}</span>
-          <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/login'); }}>
-            <LogOut className="w-4 h-4 mr-1" /> Logout
-          </Button>
-        </div>
-      </div>
+      <Navbar />
 
       <div className="p-6 max-w-7xl mx-auto">
         {/* Overview Stats */}

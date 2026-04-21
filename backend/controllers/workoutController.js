@@ -134,10 +134,11 @@ export const createWorkoutPlan = async (req, res) => {
       workout.cooldown?.forEach(ex => exerciseIds.push(ex.exerciseId));
     });
 
-    const existingExercises = await Exercise.find({
-      _id: { $in: exerciseIds },
-      isActive: true
-    });
+    // Admins can reference any exercise; non-admins only active ones
+    const exerciseFilter = { _id: { $in: exerciseIds } };
+    if (req.user?.userType !== "admin") exerciseFilter.isActive = true;
+
+    const existingExercises = await Exercise.find(exerciseFilter);
 
     if (existingExercises.length !== exerciseIds.length) {
       return res.status(400).json({ message: "Some exercises not found or inactive" });

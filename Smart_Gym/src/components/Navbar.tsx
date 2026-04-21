@@ -25,22 +25,29 @@ const Navbar = () => {
   // Close mobile menu on route change
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-  const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "Exercises", path: "/exercises" },
-    { name: "Workout Plans", path: "/workout-plans" },
-    ...(user ? [{ name: "My Workouts", path: "/my-workouts" }] : []),
-    { name: "Trainers", path: "/trainers" },
-    ...(user?.userType === "user" ? [
-      { name: "Browse Sessions", path: "/browse-slots" },
-      { name: "My Bookings", path: "/my-bookings" },
-      { name: "My Requests", path: "/my-requests" },
-    ] : []),
-    ...(user?.userType === "trainer" ? [
-      { name: "Session Slots", path: "/session-slots" },
-    ] : []),
-    { name: "Chat", path: "/chat" },
-  ];
+  const navLinks = user?.userType === "admin"
+    ? [
+        { name: "Home", path: "/" },
+        { name: "Exercises", path: "/exercises" },
+        { name: "Workout Plans", path: "/workout-plans" },
+        { name: "Trainers", path: "/trainers" },
+      ]
+    : [
+        { name: "Home", path: "/" },
+        { name: "Exercises", path: "/exercises" },
+        { name: "Workout Plans", path: "/workout-plans" },
+        ...(user ? [{ name: "My Workouts", path: "/my-workouts" }] : []),
+        { name: "Trainers", path: "/trainers" },
+        ...(user?.userType === "user" ? [
+          { name: "Browse Sessions", path: "/browse-slots" },
+          { name: "My Bookings", path: "/my-bookings" },
+          { name: "My Requests", path: "/my-requests" },
+        ] : []),
+        ...(user?.userType === "trainer" ? [
+          { name: "Session Slots", path: "/session-slots" },
+        ] : []),
+        { name: "Chat", path: "/chat" },
+      ];
 
   const isActive = (path: string) => location.pathname === path;
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';

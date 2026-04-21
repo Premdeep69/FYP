@@ -58,7 +58,8 @@ router.delete("/exercises/:id/permanent", permanentlyDeleteExercise);
 
 // Admin workout plan management
 router.get("/workout-plans", async (req, res) => {
-  req.query.isPublic = undefined;
+  // Delete the isPublic key so the controller's admin-check branch fires
+  delete req.query.isPublic;
   return getWorkoutPlans(req, res);
 });
 router.post("/workout-plans", createWorkoutPlan);
