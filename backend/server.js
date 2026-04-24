@@ -6,7 +6,7 @@ import { startExpiryJob } from "./jobs/expireSessionRequests.js";
 import { initializeSchedulers } from "./jobs/notificationScheduler.js";
 import { handleConnection } from "./socket/socketHandler.js";
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 10000;
 
 // Create HTTP server
 const server = createServer(app);

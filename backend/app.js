@@ -5,9 +5,15 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
 
-// Load env vars synchronously — resolve path relative to this file
+// Load env vars synchronously — resolve all paths relative to this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load base .env first (development defaults)
 dotenv.config({ path: join(__dirname, ".env") });
+
+// Load environment-specific file with override=true so it wins over base .env
+const envFile = join(__dirname, `.env.${process.env.NODE_ENV || "development"}`);
+dotenv.config({ path: envFile, override: true });
 
 // Routes
 import adminRoutes from "./routes/admin.js";
@@ -22,10 +28,6 @@ import seedRoutes from "./routes/seed.js";
 import sessionRequestRoutes from "./routes/sessionRequest.js";
 import sessionSlotRoutes from "./routes/sessionSlot.js";
 import workoutRoutes from "./routes/workout.js";
-
-dotenv.config({
-  path: `.env.${process.env.NODE_ENV || "development"}`
-});
 
 const app = express();
 app.set('trust proxy', 1);
