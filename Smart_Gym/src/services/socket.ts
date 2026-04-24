@@ -49,6 +49,10 @@ export interface User {
   isOnline?: boolean;
 }
 
+const SOCKET_URL = import.meta.env.MODE === "production"
+  ? "https://fyp-uh1f.onrender.com"
+  : "http://localhost:5000";
+
 class SocketService {
   private socket: Socket | null = null;
   private token: string | null = null;
@@ -61,7 +65,7 @@ class SocketService {
       this.socket.disconnect();
     }
     
-    this.socket = io('http://localhost:5000', {
+    this.socket = io(SOCKET_URL, {
       auth: {
         token: token,
       },
