@@ -30,19 +30,29 @@ export const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Generate email verification token (24h expiry)
-    const verificationToken = generateSecureToken();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // In production without SMTP, auto-verify all users so they can log in immediately
+    const skipEmailVerification = process.env.NODE_ENV === "production" &&
+      !process.env.SMTP_HOST;
+
+    const verificationToken = skipEmailVerification ? null : generateSecureToken();
+    const verificationExpires = skipEmailVerification
+      ? null
+      : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const userData = {
       name,
       email,
       password: hashedPassword,
       userType,
-      emailVerified: false,
+      emailVerified: skipEmailVerification ? true : false,
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
     };
+
+    // Regular users are immediately active when email is auto-verified
+    if (skipEmailVerification && userType === "user") {
+      userData.isActive = true;
+    }
 
     if (userType === "user") {
       userData.profile = {
@@ -87,16 +97,20 @@ export const registerUser = async (req, res) => {
       if (docInserts.length > 0) await TrainerDocument.insertMany(docInserts);
     }
 
-    // Send verification email (non-blocking — don't fail registration if email fails)
-    try {
-      await sendVerificationEmail(user, verificationToken);
-    } catch (emailErr) {
-      console.error("Failed to send verification email:", emailErr.message);
+    // Send verification email (skip in production without SMTP)
+    if (!skipEmailVerification) {
+      try {
+        await sendVerificationEmail(user, verificationToken);
+      } catch (emailErr) {
+        console.error("Failed to send verification email:", emailErr.message);
+      }
     }
 
     res.status(201).json({
-      message: "Account created successfully. Please check your email to verify your account.",
-      requiresVerification: true,
+      message: skipEmailVerification
+        ? "Account created successfully. You can now log in."
+        : "Account created successfully. Please check your email to verify your account.",
+      requiresVerification: !skipEmailVerification,
       user: {
         id: user._id,
         name: user.name,
